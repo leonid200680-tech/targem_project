@@ -1,15 +1,18 @@
 using UnityEngine;
 
-public class FlashlightSystem : MonoBehaviour
+public class Flashlight : MonoBehaviour
 {
-    [Header("Настройки фонарика")]
-    public ItemData flashlightItem;       // Ассет фонарика из папки Items
-    public GameObject handModel;          // Модель фонарика в руках (дочерняя камеры)
-    public Light spotLight;               // Источник света (Spot Light)
+    [Header("Ссылки")]
+    public Light spotLight;
+    public ItemData flashlightItem;
+    public ItemData batteryItem;
+    public InventoryUI inventoryUI; // Ссылка на наш UI
+    public GameObject handModel;    // Модель фонарика в руках (если есть)
 
-    [Header("Заряд (по желанию)")]
-    public float maxCharge = 100f;
-    public float currentCharge = 100f;
+    [Header("Заряд")]
+    public float maxCharge = 60f;
+    public float currentCharge = 60f;
+    public float batteryRefill = 30f;
 
     private Inventory inventory;
     private bool isOn = false;
@@ -17,44 +20,64 @@ public class FlashlightSystem : MonoBehaviour
     void Start()
     {
         inventory = GetComponent<Inventory>();
-
-        // На старте всё выключено
-        if (handModel != null) handModel.SetActive(false);
         if (spotLight != null) spotLight.enabled = false;
+        if (handModel != null) handModel.SetActive(false);
     }
 
     void Update()
     {
-        if (inventory == null) return;
+        if (inventory == null || inventoryUI == null) return;
 
-        // 1. Проверяем, подобрали ли мы фонарик
+        // Проверяем: есть ли фонарик в сумке И выбран ли именно он сейчас
+        bool isSelected = inventoryUI.GetSelectedItem() == flashlightItem;
         bool hasFlashlight = inventory.Has(flashlightItem);
 
-        // 2. Включаем/выключаем отображение модели в руках
+        // Показываем модель в руках, только если выбран фонарик
         if (handModel != null)
-            handModel.SetActive(hasFlashlight);
+            handModel.SetActive(isSelected);
 
-        // 3. Управление светом по кнопке F
-        if (Input.GetKeyDown(KeyCode.F) && hasFlashlight)
+        // Если переключились на другой предмет, принудительно тушим свет
+        if (!isSelected && isOn)
         {
-            if (currentCharge > 0)
-            {
-                isOn = !isOn; // Переключаем состояние
-                if (spotLight != null) spotLight.enabled = isOn;
-            }
+            isOn = false;
+            if (spotLight != null) spotLight.enabled = false;
         }
 
-        // 4. Тратим заряд, если свет горит
-        if (isOn && currentCharge > 0)
+        // Включение по F
+        if (Input.GetKeyDown(KeyCode.F) && isSelected && currentCharge > 0)
         {
-            currentCharge -= Time.deltaTime * 1.5f; // Скорость разряда
+            isOn = !isOn;
+            if (spotLight != null) spotLight.enabled = isOn;
+        }
+
+        // Расход заряда
+        if (isOn)
+        {
+            currentCharge -= Time.deltaTime;
             if (currentCharge <= 0)
             {
                 currentCharge = 0;
                 isOn = false;
                 if (spotLight != null) spotLight.enabled = false;
-                Debug.Log("Фонарик сел!");
+                Debug.Log("Фонарик разрядился!");
             }
         }
+
+        // Зарядка батарейкой
+        if (Input.GetKeyDown(KeyCode.R) && isSelected)
+        {
+            if (inventory.Has(batteryItem) && currentCharge < maxCharge)
+            {
+                inventory.Remove(batteryItem, 1);
+                currentCharge = Mathf.Min(currentCharge + batteryRefill, maxCharge);
+                Debug.Log("Фонарик заряжен: " + currentCharge);
+            }
+        }
+    }
+    // Публичный метод, чтобы другие скрипты могли проверить наличие фонарика
+    public bool HasFlashlightInInventory()
+    {
+        if (inventory == null) return false;
+        return inventory.Has(flashlightItem);
     }
 }
