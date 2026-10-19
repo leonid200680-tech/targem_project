@@ -1144,6 +1144,10 @@ PrefabInstance:
       value: Battery (1)
       objectReference: {fileID: 0}
     - target: {fileID: 6383031740911737880, guid: 79614d08107f1af4da6e62737f0d95e7, type: 3}
+      propertyPath: amount
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6383031740911737880, guid: 79614d08107f1af4da6e62737f0d95e7, type: 3}
       propertyPath: prompt
       value: "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 E"
       objectReference: {fileID: 0}
@@ -1582,6 +1586,7 @@ GameObject:
   - component: {fileID: 958187591}
   - component: {fileID: 958187592}
   - component: {fileID: 958187593}
+  - component: {fileID: 958187594}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -1677,14 +1682,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 958187584}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -1, z: -0, w: -0.00000022351739}
-  m_LocalPosition: {x: -30.78, y: 1.05, z: -37.28}
+  m_LocalRotation: {x: -0, y: -0.73509645, z: -0, w: 0.67796254}
+  m_LocalPosition: {x: -30.05, y: 0.299, z: -41.46}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1823688467}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: -180, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -94.631, z: 0}
 --- !u!114 &958187589
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1785,6 +1790,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInteraction
   interactDistance: 3
   interactionText: {fileID: 1333739311}
+--- !u!114 &958187594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 958187584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e931235dc1fee094ab929b4dbe759701, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IntroSequence
+  blackScreen: {fileID: 1834900594}
+  blinkCount: 3
+  fadeOutTime: 0.5
+  waitClosedTime: 0.2
+  fadeInTime: 0.8
 --- !u!1 &990848408
 GameObject:
   m_ObjectHideFlags: 0
@@ -2824,6 +2846,81 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 2
   m_Center: {x: -9.3132224e-10, y: -1.7533943e-11, z: 0.0091920635}
+--- !u!1 &1834900594
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1834900595}
+  - component: {fileID: 1834900597}
+  - component: {fileID: 1834900596}
+  m_Layer: 5
+  m_Name: BlackScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1834900595
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1834900594}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2074585598}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1834900596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1834900594}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1834900597
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1834900594}
+  m_CullTransparentMesh: 1
 --- !u!1 &1878780041
 GameObject:
   m_ObjectHideFlags: 0
@@ -3212,6 +3309,10 @@ PrefabInstance:
       value: Battery (2)
       objectReference: {fileID: 0}
     - target: {fileID: 6383031740911737880, guid: 79614d08107f1af4da6e62737f0d95e7, type: 3}
+      propertyPath: amount
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6383031740911737880, guid: 79614d08107f1af4da6e62737f0d95e7, type: 3}
       propertyPath: prompt
       value: "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 E"
       objectReference: {fileID: 0}
@@ -3380,6 +3481,7 @@ RectTransform:
   - {fileID: 947947733}
   - {fileID: 1122512282}
   - {fileID: 1087864114}
+  - {fileID: 1834900595}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
