@@ -3,48 +3,42 @@ using UnityEngine.UI;
 
 public class PlayerInteraction : MonoBehaviour
 {
-    public float interactDistance = 3f; // Дальность взаимодействия
-    public Text interactionText;        // Ссылка на текст подсказки
-
+    public float interactDistance = 3f;
+    public Text interactionText;
     private Camera cam;
     private Inventory playerInventory;
 
     void Start()
     {
         cam = Camera.main;
-        playerInventory = GetComponent<Inventory>(); // Ищем инвентарь на игроке
-        if (interactionText != null)
-            interactionText.gameObject.SetActive(false);
+        playerInventory = GetComponent<Inventory>();
+        if (interactionText != null) interactionText.gameObject.SetActive(false);
     }
 
     void Update()
     {
-        // Пускаем луч из центра экрана
         Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit, interactDistance))
+        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            // 1. Проверяем, ДВЕРЬ ли это
-            InteractableDoor door = hit.collider.GetComponent<InteractableDoor>();
-            if (door != null)
+            if (hit.collider.TryGetComponent(out InteractableDoor door))
             {
                 ShowText(door.prompt);
                 if (Input.GetKeyDown(KeyCode.E)) door.Interact();
                 return;
             }
-
-            // 2. Проверяем, ПРЕДМЕТ ли это
-            PickupItem item = hit.collider.GetComponent<PickupItem>();
-            if (item != null)
+            if (hit.collider.TryGetComponent(out PickupItem item))
             {
                 ShowText(item.prompt);
                 if (Input.GetKeyDown(KeyCode.E)) item.Pickup(playerInventory);
                 return;
             }
+            if (hit.collider.TryGetComponent(out InteractableTV tv))
+            {
+                ShowText(tv.prompt);
+                if (Input.GetKeyDown(KeyCode.E)) tv.Interact();
+                return;
+            }
         }
-
-        // Если ни на что не смотрим — прячем текст
         HideText();
     }
 
@@ -59,7 +53,6 @@ public class PlayerInteraction : MonoBehaviour
 
     void HideText()
     {
-        if (interactionText != null)
-            interactionText.gameObject.SetActive(false);
+        if (interactionText != null) interactionText.gameObject.SetActive(false);
     }
 }
