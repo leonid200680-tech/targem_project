@@ -6,21 +6,29 @@ using System.Collections.Generic;
 public class GhostChase : MonoBehaviour
 {
     [Header("Настройки зрения")]
-    public float viewDistance = 8f;       // Дистанция, с которой она видит
-    public float viewAngle = 60f;         // Угол обзора (60 градусов вперёд)
-    public LayerMask obstacleMask;        // Слой стен (чтобы не видеть сквозь них)
+    public float viewDistance = 8f;
+    public float viewAngle = 60f;
+    public LayerMask obstacleMask;
 
     [Header("Патрулирование (прогулка)")]
-    public List<Transform> waypoints;     // Сюда перетащим точки в Инспекторе
+    public List<Transform> waypoints;
     public float walkSpeed = 1.5f;
     public float chaseSpeed = 3.5f;
-    public float waitAtPointTime = 3f;    // Сколько секунд она стоит на точке
+    public float waitAtPointTime = 3f;
+
+    [Header("Поиск игрока")]
+    public float searchWaitTime = 4f; // Сколько секунд она стоит на месте, где видела игрока
 
     private NavMeshAgent agent;
     private Transform player;
     private int currentWaypointIndex = 0;
     private float waitTimer = 0f;
-    private bool isChasing = false;
+
+    // Состояния бабки
+    private enum State { Patrolling, Chasing, Searching }
+    private State currentState = State.Patrolling;
+
+    private Vector3 lastKnownPosition;
     private Animator animator;
 
     void Start()
@@ -31,7 +39,6 @@ public class GhostChase : MonoBehaviour
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null) player = playerObj.transform;
 
-        // Начинаем с прогулки
         agent.speed = walkSpeed;
         GoToNextWaypoint();
     }
@@ -40,36 +47,54 @@ public class GhostChase : MonoBehaviour
     {
         if (player == null) return;
 
-        // 1. Проверяем, видим ли мы игрока
-        if (CanSeePlayer())
+        // Проверяем, видит ли она игрока прямо сейчас
+        bool canSeePlayer = CanSeePlayer();
+
+        if (canSeePlayer)
         {
-            if (!isChasing)
+            // Если видит — переходит в режим погони
+            lastKnownPosition = player.position; // Запоминаем, где он
+
+            if (currentState != State.Chasing)
             {
-                isChasing = true;
+                currentState = State.Chasing;
                 agent.speed = chaseSpeed;
                 if (animator != null) animator.SetBool("isRunning", true);
-                Debug.Log("[Ghost] Увидела игрока и бежит!");
             }
 
-            // Бежим к игроку
             agent.SetDestination(player.position);
         }
         else
         {
-            // Если не видим и бежали — перестаем бежать
-            if (isChasing)
+            // Если не видит
+            if (currentState == State.Chasing)
             {
-                isChasing = false;
-                agent.speed = walkSpeed;
+                // Только что потеряла из виду! Переходим в режим поиска
+                currentState = State.Searching;
+                agent.speed = walkSpeed; // Идет быстрым шагом
                 if (animator != null) animator.SetBool("isRunning", false);
-                Debug.Log("[Ghost] Потеряла игрока из виду. Идет гулять.");
-                GoToNextWaypoint();
-            }
 
-            // 2. Логика прогулки (если не бежим за игроком)
-            if (!isChasing)
+                // Идет к последней точке, где видела
+                agent.SetDestination(lastKnownPosition);
+                waitTimer = 0f;
+            }
+            else if (currentState == State.Searching)
             {
-                // Если агент не строит путь, не бежит и его скорость почти нулевая (он стоит)
+                // Дошла до места поиска?
+                if (!agent.pathPending && agent.velocity.sqrMagnitude < 0.1f)
+                {
+                    waitTimer += Time.deltaTime;
+                    // Если постояла достаточно — сдается и возвращается к патрулю
+                    if (waitTimer >= searchWaitTime)
+                    {
+                        currentState = State.Patrolling;
+                        GoToNextWaypoint();
+                    }
+                }
+            }
+            else if (currentState == State.Patrolling)
+            {
+                // Обычная прогулка
                 if (!agent.pathPending && agent.velocity.sqrMagnitude < 0.1f)
                 {
                     waitTimer += Time.deltaTime;
@@ -87,19 +112,15 @@ public class GhostChase : MonoBehaviour
         Vector3 dirToPlayer = player.position - transform.position;
         float distance = dirToPlayer.magnitude;
 
-        // Проверка дистанции
         if (distance > viewDistance) return false;
 
-        // Проверка угла (в поле зрения ли игрок)
         float angle = Vector3.Angle(transform.forward, dirToPlayer);
         if (angle > viewAngle / 2f) return false;
 
-        // Проверка стен (Raycast из глаз бабки в игрока)
-        // Если луч попадает в стену (obstacleMask), значит она не видит игрока
         if (Physics.Raycast(transform.position + Vector3.up * 1.5f, dirToPlayer.normalized, out RaycastHit hit, distance))
         {
             if (hit.collider.CompareTag("Player")) return true;
-            else return false; // Луч попал в стену/мебель
+            else return false;
         }
 
         return true;
@@ -108,28 +129,15 @@ public class GhostChase : MonoBehaviour
     void GoToNextWaypoint()
     {
         waitTimer = 0f;
+        if (waypoints == null || waypoints.Count == 0) return;
 
-        if (waypoints == null || waypoints.Count == 0)
-        {
-            Debug.LogWarning("[Ghost] Список точек пуст! Добавь точки в скрипт.");
-            return;
-        }
-
-        // Выбираем случайную точку, чтобы она не бегала туда-сюда по одной линии
         currentWaypointIndex = Random.Range(0, waypoints.Count);
         Transform targetPoint = waypoints[currentWaypointIndex];
 
-        // Проверяем, находится ли точка на NavMesh (на полу)
         NavMeshHit hit;
         if (NavMesh.SamplePosition(targetPoint.position, out hit, 2.0f, NavMesh.AllAreas))
         {
             agent.SetDestination(hit.position);
-        }
-        else
-        {
-            Debug.LogWarning("[Ghost] Точка " + targetPoint.name + " не находится на NavMesh! Проверь её позицию в сцене.");
-            // Если точка плохая, вызываем метод еще раз, чтобы взять другую
-            GoToNextWaypoint();
         }
     }
 }
