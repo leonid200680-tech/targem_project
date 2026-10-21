@@ -38,6 +38,14 @@ public class PlayerInteraction : MonoBehaviour
                 if (Input.GetKeyDown(KeyCode.E)) tv.Interact();
                 return;
             }
+            // 4. Проверяем, СИГАРЕТЫ ли это
+            CigarettePack cigs = hit.collider.GetComponent<CigarettePack>();
+            if (cigs != null)
+            {
+                ShowText(cigs.prompt);
+                if (Input.GetKeyDown(KeyCode.E)) cigs.Interact(playerInventory);
+                return;
+            }
         }
         HideText();
     }
