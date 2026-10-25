@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5fb99515caf3b074f9be1904dc0efaff
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 214007
+  packageName: HDRP Oak Tree
+  packageVersion: 1.1
+  assetPath: Assets/HDRP_Oak_Tree/Models/Oak/Materials/Bark_Oak.mat
+  uploadId: 613932

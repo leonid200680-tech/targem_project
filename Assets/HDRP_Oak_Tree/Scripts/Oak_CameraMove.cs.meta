@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: e6a5da44cc5ad734fa882ffb97b84f3f
+timeCreated: 1497034986
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 214007
+  packageName: HDRP Oak Tree
+  packageVersion: 1.1
+  assetPath: Assets/HDRP_Oak_Tree/Scripts/Oak_CameraMove.cs
+  uploadId: 613932
