@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3fe64515d13514a2ba25d1e0dc00c616
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 253195
+  packageName: TreeAndGrassPack
+  packageVersion: 1.2
+  assetPath: Assets/TreeAndGrassPack/Materials/rock.mat
+  uploadId: 590882

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3492b2569b74f415484e7951e74f5b88
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 253195
+  packageName: TreeAndGrassPack
+  packageVersion: 1.2
+  assetPath: Assets/TreeAndGrassPack/Materials/trunk.mat
+  uploadId: 590882
