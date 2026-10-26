@@ -438,7 +438,7 @@ namespace ALP8310.ShaderDrawers
         {
             height = base.GetPropertyHeight(prop, label, editor);
 
-            if (prop.type == MaterialProperty.PropType.Vector)
+            if (prop.propertyType == UnityEngine.Rendering.ShaderPropertyType.Vector)
                 return height * (this.labels.Length + 1);
             else
                 return height;
@@ -446,7 +446,7 @@ namespace ALP8310.ShaderDrawers
 
         public override void OnGUI(Rect position, MaterialProperty prop, GUIContent label, MaterialEditor editor)
         {
-            if (prop.type == MaterialProperty.PropType.Vector)
+            if (prop.propertyType == UnityEngine.Rendering.ShaderPropertyType.Vector)
             {
                 position = EditorGUI.IndentedRect(position);
                 var v = prop.vectorValue;

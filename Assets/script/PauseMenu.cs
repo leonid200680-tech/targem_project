@@ -1,51 +1,92 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // For loading scenes
 
-public class SimplePauseMenu : MonoBehaviour
+public class PauseMenu : MonoBehaviour
 {
-    public GameObject pauseMenu; // Reference to the pause menu UI element
-    private bool isPaused = false; // Tracks whether the game is paused
+    public static bool GameIsPaused = false;
 
-    void Update()
+    [Header("Panels")]
+    public GameObject pauseMenuPanel;
+    public GameObject gameplayHUD;
+    public GameObject mainMenuPanel;
+    public GameObject settingsPanel; // <-- ÄÎÁÀÂÈËÈ ÏÀÍÅËÜ ÍÀÑÒÐÎÅÊ
+    public AudioListener menuAudioListener;
+    public GameObject videoBackground;
+
+    private void Start()
     {
-        // Toggle pause when Escape is pressed
+        if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
+    }
+
+    private void Update()
+    {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (isPaused)
+            // Åñëè îòêðûòû íàñòðîéêè, Esc äîëæåí çàêðûâàòü èõ
+            if (settingsPanel.activeSelf)
             {
-                ResumeGame();
+                ClosePauseSettings();
+                return;
             }
-            else
-            {
-                PauseGame();
-            }
+
+            if (GameIsPaused) Resume();
+            else Pause();
         }
     }
 
-    // Call this method to pause the game
-    public void PauseGame()
+    public void Resume()
     {
-        pauseMenu.SetActive(true); // Show the pause menu
-        Time.timeScale = 0; // Stop game time
-        isPaused = true; // Set paused state
-        Cursor.visible = true; // Show cursor
-        Cursor.lockState = CursorLockMode.None; // Unlock cursor
+        pauseMenuPanel.SetActive(false);
+        if (gameplayHUD != null) gameplayHUD.SetActive(true);
+
+        Time.timeScale = 1f;
+        GameIsPaused = false;
+        AudioListener.pause = false;
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
     }
 
-    // Call this method to resume the game
-    public void ResumeGame()
+    public void Pause()
     {
-        pauseMenu.SetActive(false); // Hide the pause menu
-        Time.timeScale = 1; // Resume game time
-        isPaused = false; // Clear paused state
-        Cursor.visible = false; // Hide cursor
-        Cursor.lockState = CursorLockMode.Locked; // Lock cursor
+        pauseMenuPanel.SetActive(true);
+        if (gameplayHUD != null) gameplayHUD.SetActive(false);
+
+        Time.timeScale = 0f;
+        GameIsPaused = true;
+        AudioListener.pause = true;
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
     }
 
-    // Call this method to quit to the desktop
-    public void QuitToDesktop()
+    // --- ÍÎÂÛÅ ÌÅÒÎÄÛ ÄËß ÍÀÑÒÐÎÅÊ ÈÇ ÏÀÓÇÛ ---
+
+    public void OpenPauseSettings()
     {
-        Time.timeScale = 1; // Resume game time
-        Application.Quit(); // Quit the application
+        pauseMenuPanel.SetActive(false); // Ïðÿ÷åì ìåíþ ïàóçû
+        settingsPanel.SetActive(true);   // Ïîêàçûâàåì íàñòðîéêè
+        PauseMenu.GameIsPaused = true;
+    }
+
+    public void ClosePauseSettings()
+    {
+        settingsPanel.SetActive(false);  // Ïðÿ÷åì íàñòðîéêè
+        pauseMenuPanel.SetActive(true);  // Âîçâðàùàåì ìåíþ ïàóçû
+    }
+
+    // ------------------------------------------
+
+    public void GoToMainMenu()
+    {
+        Time.timeScale = 1f;
+        GameIsPaused = false;
+        AudioListener.pause = false;
+
+        pauseMenuPanel.SetActive(false);
+        mainMenuPanel.SetActive(true);
+
+        if (videoBackground != null) videoBackground.SetActive(true); 
+
+        GameObject menuMusic = GameObject.Find("MenuMusic");
+        if (menuMusic != null) menuMusic.GetComponent<AudioSource>().Play();
+        if (menuAudioListener != null) menuAudioListener.enabled = true;
     }
 }

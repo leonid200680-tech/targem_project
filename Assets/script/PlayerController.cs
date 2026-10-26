@@ -56,6 +56,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (PauseMenu.GameIsPaused) return;
         HandleMouseLook();
         HandleMovement();
         HandleHeadBob();

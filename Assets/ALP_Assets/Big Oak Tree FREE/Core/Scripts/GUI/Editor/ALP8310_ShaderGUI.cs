@@ -750,7 +750,7 @@ public class ALP8310_ShaderGUI : ShaderGUI
         {
             var prop = props[i];
 
-            if (prop.flags == MaterialProperty.PropFlags.HideInInspector)
+            if (prop.propertyFlags == UnityEngine.Rendering.ShaderPropertyFlags.HideInInspector)
                 continue;
 
             if (prop.name == "unity_Lightmaps")

@@ -5,48 +5,44 @@ public class LighterInHands : MonoBehaviour
     [Header("Ссылки на модель в руках")]
     public GameObject lighterModelInHands; // LighterHolder
     public ItemData lighterItem;
+    public InventoryUI inventoryUI; // <--- ДОБАВИЛ: Перетащи сюда UI инвентаря
 
     [Header("Свет и Звук")]
-    public Light lighterFlame;             // Объект LighterFlame (Point Light)
-    public AudioSource lighterAudioSource; // Audio Source на модели
+    public Light lighterFlame;
+    public AudioSource lighterAudioSource;
 
-    private Inventory inventory;
-    private InventoryUI inventoryUI;
     private bool isLit = false;
 
     void Start()
     {
-        inventory = GetComponent<Inventory>();
-        inventoryUI = FindObjectOfType<InventoryUI>();
-
         if (lighterModelInHands != null) lighterModelInHands.SetActive(false);
         if (lighterFlame != null) lighterFlame.enabled = false;
     }
 
     void Update()
     {
-        if (inventory == null || inventoryUI == null) return;
+        if (inventoryUI == null) return;
 
-        // 1. Есть ли зажигалка в инвентаре?
-        bool hasLighter = inventory.Has(lighterItem);
-
-        // 2. Выбрана ли она сейчас в хотбаре?
+        // Проверяем, выбран ли предмет
         bool isSelected = inventoryUI.GetSelectedItem() == lighterItem;
 
-        // 3. Показываем модель в руках
+        // Если выбран - включаем, не выбран - выключаем
         if (lighterModelInHands != null)
         {
-            lighterModelInHands.SetActive(hasLighter && isSelected);
+            if (lighterModelInHands.activeSelf != isSelected)
+            {
+                lighterModelInHands.SetActive(isSelected);
+            }
         }
 
-        // Если зажигалку убрали из рук, тушим огонь
+        // Если убрали из рук, тушим огонь
         if (!isSelected && isLit)
         {
             TurnOffLighter();
         }
 
-        // 4. Поджигаем по нажатию ЛКМ (только если зажигалка в руках)
-        if (isSelected && Input.GetMouseButtonDown(0)) // 0 = Левая кнопка мыши
+        // Поджигаем по нажатию ЛКМ
+        if (isSelected && Input.GetMouseButtonDown(0))
         {
             ToggleLighter();
         }
@@ -58,9 +54,10 @@ public class LighterInHands : MonoBehaviour
 
         if (lighterFlame != null) lighterFlame.enabled = isLit;
 
-        if (lighterAudioSource != null && !lighterAudioSource.isPlaying)
+        if (lighterAudioSource != null)
         {
-            lighterAudioSource.Play();
+            if (isLit) lighterAudioSource.Play();
+            else lighterAudioSource.Stop();
         }
     }
 
@@ -68,5 +65,6 @@ public class LighterInHands : MonoBehaviour
     {
         isLit = false;
         if (lighterFlame != null) lighterFlame.enabled = false;
+        if (lighterAudioSource != null) lighterAudioSource.Stop();
     }
 }

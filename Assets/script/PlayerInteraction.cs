@@ -17,6 +17,7 @@ public class PlayerInteraction : MonoBehaviour
 
     void Update()
     {
+        if (PauseMenu.GameIsPaused) return;
         Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
