@@ -10,41 +10,35 @@ public class PlayerInteraction : MonoBehaviour
 
     void Start()
     {
-        cam = Camera.main;
+        cam = GetComponentInChildren<Camera>();
         playerInventory = GetComponent<Inventory>();
         if (interactionText != null) interactionText.gameObject.SetActive(false);
     }
 
     void Update()
     {
-        if (PauseMenu.GameIsPaused) return;
         Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
+            // Проверка на ДВЕРЬ
             if (hit.collider.TryGetComponent(out InteractableDoor door))
             {
                 ShowText(door.prompt);
                 if (Input.GetKeyDown(KeyCode.E)) door.Interact();
                 return;
             }
+            // Проверка на ПРЕДМЕТ (камни, фонарик и т.д.)
             if (hit.collider.TryGetComponent(out PickupItem item))
             {
                 ShowText(item.prompt);
                 if (Input.GetKeyDown(KeyCode.E)) item.Pickup(playerInventory);
                 return;
             }
-            if (hit.collider.TryGetComponent(out InteractableTV tv))
+            // Проверка на ПЕНТАГРАММУ
+            if (hit.collider.TryGetComponent(out Pentagram pentagram))
             {
-                ShowText(tv.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) tv.Interact();
-                return;
-            }
-            // 4. Проверяем, СИГАРЕТЫ ли это
-            CigarettePack cigs = hit.collider.GetComponent<CigarettePack>();
-            if (cigs != null)
-            {
-                ShowText(cigs.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) cigs.Interact(playerInventory);
+                ShowText("Нажмите E, чтобы положить камень");
+                if (Input.GetKeyDown(KeyCode.E)) pentagram.PlaceStone(playerInventory);
                 return;
             }
         }

@@ -11,6 +11,9 @@ public class OfficeTrigger : MonoBehaviour
     [Header("Дверь")]
     public InteractableDoor doorToLock;
 
+    [Header("Телепортация после видео")]
+    public Transform spawnPoint;
+
     private bool hasTriggered = false;
 
     void Start()
@@ -23,35 +26,50 @@ public class OfficeTrigger : MonoBehaviour
         if (other.CompareTag("Player") && !hasTriggered)
         {
             hasTriggered = true;
-            StartCoroutine(PlaySequence(other.GetComponent<PlayerController>()));
+            StartCoroutine(PlaySequence(other.GetComponent<PlayerController>(), other.gameObject));
         }
     }
 
-    IEnumerator PlaySequence(PlayerController playerController)
+    IEnumerator PlaySequence(PlayerController pc, GameObject playerObj)
     {
-        // 1. Закрываем и запираем дверь
         if (doorToLock != null) doorToLock.LockDoor();
-
-        // 2. Обновляем квест
         if (QuestManager.Instance != null) QuestManager.Instance.OnOfficeReached();
 
-        // 3. Отключаем управление (опционально, чтобы игрок просто смотрел)
-        if (playerController != null) playerController.enabled = false;
+        // Отключаем управление
+        if (pc != null) pc.enabled = false;
 
-        // 4. Показываем видео
+        // Показываем видео
         if (videoPanel != null && videoPlayer != null)
         {
             videoPanel.SetActive(true);
             videoPlayer.Prepare();
             while (!videoPlayer.isPrepared) yield return null;
-
             videoPlayer.Play();
             yield return new WaitForSeconds((float)videoPlayer.clip.length);
-
             videoPanel.SetActive(false);
         }
 
-        // 5. Возвращаем управление
-        if (playerController != null) playerController.enabled = true;
+        // ТЕЛЕПОРТАЦИЯ
+        if (spawnPoint != null)
+        {
+            CharacterController cc = playerObj.GetComponent<CharacterController>();
+
+            // 1. Отключаем контроллер
+            if (cc != null) cc.enabled = false;
+
+            // 2. Перемещаем игрока
+            playerObj.transform.position = spawnPoint.position;
+            playerObj.transform.rotation = spawnPoint.rotation;
+
+            // 3. Включаем контроллер
+            if (cc != null) cc.enabled = true;
+
+            Debug.Log("Игрок телепортирован на точку: " + spawnPoint.name);
+        }
+
+        // Возвращаем управление
+        if (pc != null) pc.enabled = true;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }

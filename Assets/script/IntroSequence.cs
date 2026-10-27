@@ -9,79 +9,85 @@ public class IntroSequence : MonoBehaviour
     public GameObject blackScreen;
 
     [Header("Моргание")]
-    public int blinkCount = 3;          // Сколько раз моргнуть
-    public float fadeOutTime = 0.5f;    // Время, за которое глаза ЗАКРЫВАЮТСЯ (темнеет)
-    public float waitClosedTime = 0.2f; // Время, которое глаза остаются ЗАКРЫТЫМИ
-    public float fadeInTime = 0.8f;     // Время, за которое глаза ОТКРЫВАЮТСЯ (светлеет)
+    public int blinkCount = 2;
+    public float fadeOutTime = 0.4f;
+    public float waitClosedTime = 0.1f;
+    public float fadeInTime = 1.0f;
 
     private PlayerController playerController;
-    private NavMeshAgent ghostAgent;
 
     void Start()
     {
         playerController = GetComponent<PlayerController>();
-        GhostChase ghost = FindObjectOfType<GhostChase>();
-        if (ghost != null) ghostAgent = ghost.GetComponent<NavMeshAgent>();
 
-        // Отключаем управление на время вступления
+        // 1. Сразу отключаем управление
         if (playerController != null) playerController.enabled = false;
 
+        // 2. Запускаем анимацию
         StartCoroutine(PlayIntro());
     }
 
     IEnumerator PlayIntro()
     {
-        if (blackScreen != null)
+        // Если объект не привязан — просто включаем управление и выходим
+        if (blackScreen == null)
         {
-            blackScreen.SetActive(true);
-            Image img = blackScreen.GetComponent<Image>();
+            if (playerController != null) playerController.enabled = true;
+            yield break;
+        }
 
-            // 1. Начинаем с полностью черного экрана (глаза закрыты)
-            img.color = new Color(0, 0, 0, 1f);
+        blackScreen.SetActive(true);
+        Image img = blackScreen.GetComponent<Image>();
 
-            // 2. Ждем чуть-чуть в самом начале
-            yield return new WaitForSeconds(1f);
+        // Защита: если на объекте нет компонента Image, мы не можем менять цвет
+        if (img == null)
+        {
+            blackScreen.SetActive(false);
+            if (playerController != null) playerController.enabled = true;
+            yield break;
+        }
 
-            // 3. Цикл моргания
-            for (int i = 0; i < blinkCount; i++)
+        // Ставим полностью черный цвет
+        img.color = new Color(0, 0, 0, 1f);
+
+        // Пауза перед первым "открытием глаз"
+        yield return new WaitForSeconds(1f);
+
+        // Цикл моргания
+        for (int i = 0; i < blinkCount; i++)
+        {
+            // Открываем глаза (прозрачный экран)
+            float t = 0;
+            while (t < fadeInTime)
             {
-                // Открываем глаза (экран становится прозрачным)
-                float t = 0;
-                while (t < fadeInTime)
+                t += Time.deltaTime;
+                float alpha = Mathf.Lerp(1f, 0f, t / fadeInTime);
+                img.color = new Color(0, 0, 0, alpha);
+                yield return null;
+            }
+
+            // Если это не последнее моргание, закрываем глаза обратно
+            if (i < blinkCount - 1)
+            {
+                yield return new WaitForSeconds(waitClosedTime);
+
+                t = 0;
+                while (t < fadeOutTime)
                 {
                     t += Time.deltaTime;
-                    float alpha = Mathf.Lerp(1f, 0f, t / fadeInTime);
+                    float alpha = Mathf.Lerp(0f, 1f, t / fadeOutTime);
                     img.color = new Color(0, 0, 0, alpha);
                     yield return null;
                 }
-
-                // Если это не последнее моргание, то закрываем глаза обратно
-                if (i < blinkCount - 1)
-                {
-                    yield return new WaitForSeconds(waitClosedTime); // Держим глаза открытыми
-
-                    // Закрываем глаза (экран темнеет)
-                    t = 0;
-                    while (t < fadeOutTime)
-                    {
-                        t += Time.deltaTime;
-                        float alpha = Mathf.Lerp(0f, 1f, t / fadeOutTime);
-                        img.color = new Color(0, 0, 0, alpha);
-                        yield return null;
-                    }
-                    yield return new WaitForSeconds(waitClosedTime); // Держим глаза закрытыми
-                }
+                yield return new WaitForSeconds(waitClosedTime);
             }
-
-            // 4. Финальное выключение экрана
-            img.color = new Color(0, 0, 0, 0f);
-            blackScreen.SetActive(false);
         }
 
-        // 5. Включаем управление игроком
-        if (playerController != null) playerController.enabled = true;
+        // Финальное выключение
+        img.color = new Color(0, 0, 0, 0f);
+        blackScreen.SetActive(false);
 
-        // 6. Включаем бабку, чтобы она погналась за нами
-        if (ghostAgent != null) ghostAgent.enabled = true;
+        // Возвращаем управление
+        if (playerController != null) playerController.enabled = true;
     }
 }

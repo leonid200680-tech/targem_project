@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Audio;
 using TMPro;
+
 public class SettingsMenu : MonoBehaviour
 {
     [Header("Audio")]
@@ -15,36 +15,67 @@ public class SettingsMenu : MonoBehaviour
 
     private void Start()
     {
-        // 1. Настройка ползунков громкости
-        // Загружаем сохранённые значения, чтобы ползунки стояли на своих местах
-        masterSlider.value = PlayerPrefs.GetFloat("MasterVolume", 1f);
-        musicSlider.value = PlayerPrefs.GetFloat("MusicVolume", 1f);
-        sfxSlider.value = PlayerPrefs.GetFloat("SFXVolume", 1f);
+        // ==========================================
+        // 1. НАСТРОЙКА ЗВУКА
+        // ==========================================
 
-        // Подписываемся на изменения ползунков
-        masterSlider.onValueChanged.AddListener(AudioManager.Instance.SetMasterVolume);
-        musicSlider.onValueChanged.AddListener(AudioManager.Instance.SetMusicVolume);
-        sfxSlider.onValueChanged.AddListener(AudioManager.Instance.SetSFXVolume);
+        // Загружаем сохранённые значения (по умолчанию 0.75, чтобы не орало на весь дом)
+        masterSlider.value = PlayerPrefs.GetFloat("MasterVolume", 0.75f);
+        musicSlider.value = PlayerPrefs.GetFloat("MusicVolume", 0.5f);
+        sfxSlider.value = PlayerPrefs.GetFloat("SFXVolume", 0.75f);
 
-        // 2. Настройка выпадающего списка разрешений
+        // Проверяем, существует ли AudioManager (защита от вылета, если его нет на сцене)
+        if (AudioManager.Instance != null)
+        {
+            // Сначала применяем загруженные настройки к самому аудиоменеджеру
+            AudioManager.Instance.SetMasterVolume(masterSlider.value);
+            AudioManager.Instance.SetMusicVolume(musicSlider.value);
+            AudioManager.Instance.SetSFXVolume(sfxSlider.value);
+
+            // Подписываемся на изменения ползунков
+            masterSlider.onValueChanged.AddListener(AudioManager.Instance.SetMasterVolume);
+            musicSlider.onValueChanged.AddListener(AudioManager.Instance.SetMusicVolume);
+            sfxSlider.onValueChanged.AddListener(AudioManager.Instance.SetSFXVolume);
+        }
+        else
+        {
+            Debug.LogWarning("AudioManager не найден на сцене! Ползунки звука не будут работать.");
+        }
+
+        // ==========================================
+        // 2. НАСТРОЙКА РАЗРЕШЕНИЯ ЭКРАНА
+        // ==========================================
+
         resolutions = Screen.resolutions;
         resolutionDropdown.ClearOptions();
 
         int currentResolutionIndex = 0;
         var options = new System.Collections.Generic.List<string>();
+
         for (int i = 0; i < resolutions.Length; i++)
         {
-            string option = resolutions[i].width + " x " + resolutions[i].height;
+            string option = resolutions[i].width + " x " + resolutions[i].height + " " + resolutions[i].refreshRate + "Hz";
             options.Add(option);
 
-            if (resolutions[i].width == Screen.currentResolution.width &&
-                resolutions[i].height == Screen.currentResolution.height)
+            // Сравниваем с текущим разрешением ОКНА (Screen.width), а не рабочего стола
+            if (resolutions[i].width == Screen.width &&
+                resolutions[i].height == Screen.height)
             {
                 currentResolutionIndex = i;
             }
         }
         resolutionDropdown.AddOptions(options);
-        resolutionDropdown.value = PlayerPrefs.GetInt("ResolutionIndex", currentResolutionIndex);
+
+        // ЗАЩИТА ОТ ОШИБКИ: проверяем сохранённый индекс
+        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", currentResolutionIndex);
+
+        // Если сохранённый индекс больше, чем количество доступных разрешений — сбрасываем на текущее
+        if (savedIndex >= resolutions.Length)
+        {
+            savedIndex = currentResolutionIndex;
+        }
+
+        resolutionDropdown.value = savedIndex;
         resolutionDropdown.RefreshShownValue();
 
         // Подписываемся на изменение выбора разрешения
@@ -53,6 +84,9 @@ public class SettingsMenu : MonoBehaviour
 
     public void SetResolution(int resolutionIndex)
     {
+        // Дополнительная защита от выхода за пределы массива
+        if (resolutionIndex < 0 || resolutionIndex >= resolutions.Length) return;
+
         Resolution resolution = resolutions[resolutionIndex];
         Screen.SetResolution(resolution.width, resolution.height, Screen.fullScreen);
 

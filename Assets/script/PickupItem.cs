@@ -2,31 +2,51 @@ using UnityEngine;
 
 public class PickupItem : MonoBehaviour
 {
-    [Header("Настройки предмета")]
     public ItemData item;
     public int amount = 1;
     public string prompt = "Нажмите E, чтобы подобрать";
 
-    // Метод для взаимодействия (вызывается из PlayerInteraction)
+    // Ссылка на объект бабки, чтобы включить её
+    public GameObject ghostToSpawn;
+    private static bool ghostActivated = false; // Защита, чтобы она включилась только 1 раз
+
     public void Pickup(Inventory playerInventory)
     {
         if (playerInventory == null) return;
 
-        // Пытаемся добавить предмет в инвентарь
         if (playerInventory.Add(item, amount))
         {
-            // Если это фонарик — обновляем квест!
+            // Если подобрали фонарик — обновляем квест
             if (item.type == ItemType.Flashlight && QuestManager.Instance != null)
             {
-                QuestManager.Instance.SetQuestStep(1); // Шаг 1: Проверить телек
+                QuestManager.Instance.SetQuestStep(1);
             }
 
-            // Уничтожаем объект в мире (предмет подобран)
+            // ПРОВЕРКА: Если подобрали камень и бабка ещё не включена
+            if (item.type == ItemType.Stone && !ghostActivated)
+            {
+                ActivateGhost();
+            }
+
             Destroy(gameObject);
         }
-        else
+    }
+
+    void ActivateGhost()
+    {
+        ghostActivated = true;
+
+        // Ищем бабку, если ссылка не привязана вручную
+        if (ghostToSpawn == null)
         {
-            Debug.Log("Инвентарь полон! Не могу подобрать предмет.");
+            GhostChase ghost = FindObjectOfType<GhostChase>(true); // true - ищем даже выключенные
+            if (ghost != null) ghostToSpawn = ghost.gameObject;
+        }
+
+        if (ghostToSpawn != null)
+        {
+            ghostToSpawn.SetActive(true);
+            Debug.Log("Бабка активирована! Игрок подобрал первый камень.");
         }
     }
 }
