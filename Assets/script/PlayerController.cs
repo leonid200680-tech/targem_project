@@ -56,6 +56,8 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (DialogueManager.IsDialogueActive) return; // Игрок не ходит во время диалога
+
         if (PauseMenu.GameIsPaused) return;
         HandleMouseLook();
         HandleMovement();
