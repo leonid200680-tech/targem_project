@@ -1,78 +1,42 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Video;
 
 public class GhostKiller : MonoBehaviour
 {
-    [Header("Настройки скримера")]
-    public float killDistance = 1.5f;
-
-    [Header("Ссылки")]
     public GameObject jumpscareVideo;
     public GameObject mainMenuPanel;
-
-    private VideoPlayer videoPlayer;
     private bool isDead = false;
-    private Transform player;
-
-    void Start()
-    {
-        GameObject p = GameObject.FindWithTag("Player");
-        if (p != null) player = p.transform;
-
-        if (jumpscareVideo != null)
-            videoPlayer = jumpscareVideo.GetComponent<VideoPlayer>();
-    }
 
     void Update()
     {
-        if (player == null || isDead) return;
+        if (isDead) return;
 
-        // Если бабка близко
-        if (Vector3.Distance(transform.position, player.position) <= killDistance)
+        GameObject player = GameObject.FindWithTag("Player");
+        if (player != null && Vector3.Distance(transform.position, player.transform.position) < 1.5f)
         {
-            StartCoroutine(DieSequence());
+            // Если ForceChase разрешил убийство (canKill), тогда убиваем
+            GhostChase gc = GetComponent<GhostChase>();
+            if (gc != null && gc.CanKillPlayer())
+            {
+                StartCoroutine(DieSequence(player));
+            }
         }
     }
 
-    IEnumerator DieSequence()
+    IEnumerator DieSequence(GameObject player)
     {
         isDead = true;
+        player.GetComponent<PlayerController>().enabled = false;
 
-        // 1. Отключаем управление
-        PlayerController pc = player.GetComponent<PlayerController>();
-        if (pc != null) pc.enabled = false;
-
-        if (jumpscareVideo != null && videoPlayer != null)
+        if (jumpscareVideo != null)
         {
-            // 2. Включаем объект с видео
             jumpscareVideo.SetActive(true);
-
-            // 3. Готовим видео (очень важно для HDRP)
-            videoPlayer.Prepare();
-
-            // 4. Ждем, пока видео подготовится (обычно доля секунды)
-            while (!videoPlayer.isPrepared)
-            {
-                yield return null;
-            }
-
-            // 5. Играем видео
-            videoPlayer.Play();
-
-            // 6. Ждем, пока видео проиграется. 
-            // (clip.length — это длина видео в секундах).
-            yield return new WaitForSeconds((float)videoPlayer.clip.length);
-
-            // 7. Выключаем видео
+            yield return new WaitForSeconds(2f);
             jumpscareVideo.SetActive(false);
         }
 
-        // 8. Включаем меню
         if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
-
-        // 9. Разблокируем курсор (чтобы можно было нажимать кнопки в меню)
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
