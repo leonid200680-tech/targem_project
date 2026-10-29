@@ -51,6 +51,12 @@ public class PlayerInteraction : MonoBehaviour
                 if (Input.GetKeyDown(KeyCode.E)) candle.TryLight(playerInventory);
                 return;
             }
+            if (hit.collider.TryGetComponent(out HideableCloset closet))
+            {
+                ShowText(closet.prompt);
+                if (Input.GetKeyDown(KeyCode.E)) closet.Interact();
+                return;
+            }
         }
         HideText();
     }
