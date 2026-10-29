@@ -8,6 +8,7 @@ public class Pentagram : MonoBehaviour
     [Header("Настройки")]
     public ItemData stoneItem;
     public GameObject[] stonesOnAltar;
+    public int totalCandles = 5;
 
     [Header("Эффекты изгнания")]
     public AudioClip exorcismSound;
@@ -23,15 +24,16 @@ public class Pentagram : MonoBehaviour
     public float timeBeforeBurn = 2f;
 
     [Header("Бабки")]
-    public GameObject ritualGhost; // Перетащи сюда RitualGhost (которая стоит на пентаграмме)
+    public GameObject ritualGhost;
 
     private int stonesPlaced = 0;
+    private int candlesLit = 0;
     private bool ritualDone = false;
 
     void Start()
     {
         if (cutsceneCamera != null) cutsceneCamera.SetActive(false);
-        if (ritualGhost != null) ritualGhost.SetActive(false); // Выключаем её на старте
+        if (ritualGhost != null) ritualGhost.SetActive(false);
     }
 
     public bool PlaceStone(Inventory playerInventory)
@@ -46,13 +48,28 @@ public class Pentagram : MonoBehaviour
                 stonesOnAltar[stonesPlaced].SetActive(true);
 
             stonesPlaced++;
-
-            if (stonesPlaced >= stonesOnAltar.Length)
-                StartCoroutine(ActivateRitual());
+            CheckRitualConditions();
 
             return true;
         }
         return false;
+    }
+
+    public void OnCandleLit()
+    {
+        candlesLit++;
+        CheckRitualConditions();
+    }
+
+    void CheckRitualConditions()
+    {
+        Debug.Log($"Камни: {stonesPlaced}/{stonesOnAltar.Length} | Свечи: {candlesLit}/{totalCandles}");
+
+        // Если разложены все камни И зажжены все свечи
+        if (stonesPlaced >= stonesOnAltar.Length && candlesLit >= totalCandles && !ritualDone)
+        {
+            StartCoroutine(ActivateRitual());
+        }
     }
 
     IEnumerator ActivateRitual()
@@ -61,14 +78,12 @@ public class Pentagram : MonoBehaviour
 
         if (QuestManager.Instance != null) QuestManager.Instance.SetQuestStep(4);
 
-        // Находим настоящую бабку (которая бегает)
         GhostChase realGhost = FindObjectOfType<GhostChase>();
         PlayerController pc = FindObjectOfType<PlayerController>();
         Camera mainCam = Camera.main;
 
         if (pc == null) yield break;
 
-        // 1. Прячем руки и HUD
         if (handsToHide != null) handsToHide.SetActive(false);
         bool hudWasActive = false;
         if (hudToHide != null)
@@ -77,10 +92,8 @@ public class Pentagram : MonoBehaviour
             hudToHide.SetActive(false);
         }
 
-        // 2. Отключаем управление
         pc.enabled = false;
 
-        // 3. ВКЛЮЧАЕМ КАМЕРУ КАТСЦЕНЫ
         bool hasCutsceneCam = cutsceneCamera != null;
         if (hasCutsceneCam)
         {
@@ -88,36 +101,24 @@ public class Pentagram : MonoBehaviour
             cutsceneCamera.SetActive(true);
         }
 
-        // 4. ВЫКЛЮЧАЕМ НАСТОЯЩУЮ БАБКУ И ВКЛЮЧАЕМ РИТУАЛЬНУЮ
-        if (realGhost != null)
-        {
-            realGhost.gameObject.SetActive(false); // Бегающая бабка исчезает
-        }
+        if (realGhost != null) realGhost.gameObject.SetActive(false);
+        if (ritualGhost != null) ritualGhost.SetActive(true);
 
-        if (ritualGhost != null)
-        {
-            ritualGhost.SetActive(true); // Бабка на пентаграмме появляется
-        }
-
-        // 5. Звук
         if (exorcismSound != null)
         {
             AudioSource playerAudio = pc.GetComponent<AudioSource>();
             if (playerAudio == null) playerAudio = pc.gameObject.AddComponent<AudioSource>();
-
             playerAudio.clip = exorcismSound;
             playerAudio.spatialBlend = 0f;
             playerAudio.Play();
         }
 
-        // 6. Вспышка
         if (flashLight != null && ritualGhost != null)
         {
             flashLight.transform.position = ritualGhost.transform.position + Vector3.up * 1.5f;
             flashLight.enabled = true;
         }
 
-        // 7. Подготовка к испепелению (только для RitualGhost)
         List<Material> ghostMaterials = new List<Material>();
         if (ritualGhost != null)
         {
@@ -133,10 +134,8 @@ public class Pentagram : MonoBehaviour
             }
         }
 
-        // --- ПАУЗА ПЕРЕД НАЧАЛОМ ---
         yield return new WaitForSeconds(timeBeforeBurn);
 
-        // 8. Анимация испепеления
         float duration = 5.0f;
         float elapsed = 0f;
 
@@ -165,23 +164,19 @@ public class Pentagram : MonoBehaviour
                 yield return null;
             }
 
-            // 9. Выключаем ритуальную бабку
             ritualGhost.SetActive(false);
         }
 
         if (flashLight != null) flashLight.enabled = false;
 
-        // --- ПАУЗА В ТИШИНЕ ---
         yield return new WaitForSeconds(1.5f);
 
-        // 10. ВЫКЛЮЧАЕМ КАМЕРУ КАТСЦЕНЫ
         if (hasCutsceneCam)
         {
             cutsceneCamera.SetActive(false);
             if (mainCam != null) mainCam.gameObject.SetActive(true);
         }
 
-        // 11. Включаем обратно всё
         if (handsToHide != null) handsToHide.SetActive(true);
         if (hudToHide != null && hudWasActive) hudToHide.SetActive(true);
 
