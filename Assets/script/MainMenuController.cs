@@ -11,47 +11,56 @@ public class MainMenuController : MonoBehaviour
     public GameObject pauseMenuPanel;
 
     [Header("Player")]
-    public GameObject playerObject; // Перетащи сюда Player
+    public GameObject playerObject;
 
     [Header("Audio")]
     public AudioSource menuMusic;
+    public AudioSource gameMusic;       // Музыка в игре
+    public AudioSource swingSound;      // Звук качелей
+    public AudioSource carouselSound;   // <--- НОВЫЙ СЛОТ: Звук карусели
+    public AudioSource generatorSound;  // Звук генератора
     public AudioListener menuAudioListener;
 
-    private bool isGameStarted = false; // Флаг, чтобы понимать, началась игра или нет
+    private bool isGameStarted = false;
 
     private void Start()
     {
-        // 1. Выключаем игрока СРАЗУ (чтобы его скрипты не мешали)
+        // 1. Выключаем игрока (чтобы его камера не мешала меню)
         if (playerObject != null) playerObject.SetActive(false);
         if (videoBackground != null) videoBackground.SetActive(true);
+
         // 2. Настраиваем панели
         mainMenuPanel.SetActive(true);
         settingsPanel.SetActive(false);
         gameplayHUD.SetActive(false);
+        if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
 
-        // 3. Включаем звук
+        // 3. Звук
         AudioListener.pause = false;
 
-        GameObject musicObj = GameObject.Find("MenuMusic");
-        if (musicObj != null)
+        // Включаем музыку меню (если не привязана в инспекторе, ищем по имени)
+        if (menuMusic == null)
         {
-            AudioSource audioSource = musicObj.GetComponent<AudioSource>();
-            if (audioSource != null) audioSource.Play();
+            GameObject musicObj = GameObject.Find("MenuMusic");
+            if (musicObj != null) menuMusic = musicObj.GetComponent<AudioSource>();
         }
-        if (menuAudioListener != null) menuAudioListener.enabled = false;
-        if (playerObject != null) playerObject.SetActive(true);
-        if (menuAudioListener != null) menuAudioListener.enabled = true;
+        if (menuMusic != null) menuMusic.Play();
+
+        // На всякий случай выключаем игровые звуки при старте
+        if (gameMusic != null) gameMusic.Stop();
+        if (swingSound != null) swingSound.Stop();
+        if (carouselSound != null) carouselSound.Stop(); // <--- ВЫКЛЮЧАЕМ КАРУСЕЛЬ
+        if (generatorSound != null) generatorSound.Stop();
+
         // 4. Освобождаем мышку
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
 
-    // Этот метод будет следить за мышкой, пока мы в меню
     private void Update()
     {
         if (!isGameStarted)
         {
-            // Принудительно освобождаем мышку каждый кадр, пока не начали игру
             if (Cursor.lockState != CursorLockMode.None)
             {
                 Cursor.lockState = CursorLockMode.None;
@@ -62,15 +71,20 @@ public class MainMenuController : MonoBehaviour
 
     public void StartGame()
     {
-        isGameStarted = true; // Запоминаем, что игра началась
+        isGameStarted = true;
 
         mainMenuPanel.SetActive(false);
         if (videoBackground != null) videoBackground.SetActive(false);
         gameplayHUD.SetActive(true);
 
-        if (menuMusic != null) menuMusic.Stop();
+        // --- МУЗЫКА И ЗВУКИ ---
+        if (menuMusic != null) menuMusic.Stop();       // Выключаем меню
+        if (gameMusic != null) gameMusic.Play();       // Включаем музыку игры
+        if (swingSound != null) swingSound.Play();     // Включаем качели
+        if (carouselSound != null) carouselSound.Play(); // <--- ВКЛЮЧАЕМ КАРУСЕЛЬ
+        if (generatorSound != null) generatorSound.Play(); // Включаем генератор
+        // ----------------------
 
-        // Включаем игрока и блокируем мышку для геймплея
         if (playerObject != null) playerObject.SetActive(true);
 
         Cursor.visible = false;
@@ -90,13 +104,13 @@ public class MainMenuController : MonoBehaviour
 
         if (PauseMenu.GameIsPaused)
         {
-            mainMenuPanel.SetActive(false); // На всякий случай прячем главное меню
-            if (pauseMenuPanel != null) pauseMenuPanel.SetActive(true); // Включаем паузу
+            mainMenuPanel.SetActive(false);
+            if (pauseMenuPanel != null) pauseMenuPanel.SetActive(true);
         }
         else
         {
-            if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false); // Прячем паузу
-            mainMenuPanel.SetActive(true); // Включаем главное меню
+            if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
+            mainMenuPanel.SetActive(true);
         }
     }
 
