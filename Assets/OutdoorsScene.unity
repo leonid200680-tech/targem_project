@@ -48908,13 +48908,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 392044354}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.11733553, y: 0.082516044, z: 0.9725602, w: -0.18316703}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -15.777, y: 11.98712, z: -6.789}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: -6.749, y: -375.086, z: -157.774}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &392715289
 GameObject:
   m_ObjectHideFlags: 0
@@ -73474,6 +73474,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4b4e47268a1e89c4585eaa9ec2a6d667, type: 3}
   m_PrefabInstance: {fileID: 729376469}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &729557059
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 729557060}
+  m_Layer: 0
+  m_Name: exit point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &729557060
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 729557059}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.79034984, z: -0, w: 0.6126558}
+  m_LocalPosition: {x: -0.929, y: 1.7480001, z: -0.383}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2024119914}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &731601995
 GameObject:
   m_ObjectHideFlags: 0
@@ -106206,6 +106237,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.7834573, y: 0.18974493, z: 0.5500337}
   m_Center: {x: -0.042492017, y: 0.40513384, z: 0.22498149}
+--- !u!1 &1061960425
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1061960426}
+  m_Layer: 0
+  m_Name: HidePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1061960426
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1061960425}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.79034984, z: -0, w: 0.6126558}
+  m_LocalPosition: {x: 0, y: 1.7480001, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2024119914}
+  m_LocalEulerAnglesHint: {x: 0, y: -104.436, z: 0}
 --- !u!1 &1063439148
 GameObject:
   m_ObjectHideFlags: 0
@@ -111597,7 +111659,7 @@ MonoBehaviour:
   noiseSound: {fileID: 8300000, guid: 1482d5dfdceaa7b40997f99e4597a8f5, type: 3}
   screamSound: {fileID: 8300000, guid: 66a79d205886f3e44a66fa45313dec22, type: 3}
   heartbeatSound: {fileID: 8300000, guid: 70cafd3f2c37e2d4c93c212739198d3c, type: 3}
-  maxHearDistance: 15
+  maxHearDistance: 10
   realGhost: {fileID: 1621515906}
 --- !u!4 &1150602171
 Transform:
@@ -133744,6 +133806,22 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1368620221}
   m_Mesh: {fileID: -4747419336566570729, guid: d8debdfd4fd89e44b9db074aa0257fed, type: 3}
+--- !u!114 &1370287564
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2024119913}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9765880a177864a44a90775dc5bc11c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableCloset
+  hidePoint: {fileID: 1061960426}
+  exitPoint: {fileID: 729557060}
+  prompt: "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 E, \u0447\u0442\u043E\u0431\u044B
+    \u0441\u043F\u0440\u044F\u0442\u0430\u0442\u044C\u0441\u044F"
 --- !u!1 &1370665992
 GameObject:
   m_ObjectHideFlags: 0
@@ -150593,7 +150671,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: dbf83a4495785ec4797e91b80c69f801, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: dbf83a4495785ec4797e91b80c69f801, type: 3}
       propertyPath: m_TagString
@@ -155310,9 +155388,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d4e4bf2790fa0b4a934d91abd99d0ba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GhostChase
+  viewDistance: 10
+  viewAngle: 60
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 0
+  waypoints: []
   walkSpeed: 1.5
   chaseSpeed: 3.5
-  waypoints: []
 --- !u!195 &1621515909
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -155354,7 +155437,7 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 100
+  m_Radius: 2
   m_Height: 1
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
@@ -192116,10 +192199,19 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6016411}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1061960426}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 729557060}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2024119917}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1370287564}
     - targetCorrespondingSourceObject: {fileID: -516098083770646512, guid: bb805d595567def41b22f2aa073eceb6, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2024119923}
