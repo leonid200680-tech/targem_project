@@ -1,47 +1,44 @@
-using System.Collections;
 using UnityEngine;
 
 public class FlyingGhost : MonoBehaviour
 {
-    public float speed = 20f; // Скорость полета
+    public float flySpeed = 15f;
 
     private Vector3 targetPosition;
     private bool isFlying = false;
+    private Animator anim;
+
+    void Start()
+    {
+        anim = GetComponent<Animator>();
+    }
 
     public void StartFlight(Vector3 startPos, Vector3 endPos)
     {
-        transform.position = startPos; // Ставим в начало
-        targetPosition = endPos;       // Запоминаем, куда лететь
-
-        // Разворачиваем её носом в сторону цели (чтобы летела лицом вперед)
+        transform.position = startPos;
+        targetPosition = endPos;
         transform.LookAt(targetPosition);
-        // Если модель смотрит назад, раскомментируй строку ниже:
-        // transform.Rotate(0, 180, 0);
 
         gameObject.SetActive(true);
         isFlying = true;
-
-        // Запускаем таймер, чтобы она исчезла, если вдруг промахнется
-        Invoke("StopFlight", 3f);
     }
 
     void Update()
     {
         if (!isFlying) return;
 
-        // Двигаем бабку к финишной точке
-        transform.position = Vector3.MoveTowards(transform.position, targetPosition, speed * Time.deltaTime);
+        // ГОВОРИМ BLEND TREE, ЧТО МЫ БЕЖИМ НА ОГРОМНОЙ СКОРОСТИ
+        if (anim != null)
+        {
+            anim.SetFloat("Speed", 10f);
+        }
 
-        // Если долетела до конца — исчезает
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, flySpeed * Time.deltaTime);
+
         if (Vector3.Distance(transform.position, targetPosition) < 0.5f)
         {
-            StopFlight();
+            isFlying = false;
+            gameObject.SetActive(false);
         }
-    }
-
-    public void StopFlight()
-    {
-        isFlying = false;
-        gameObject.SetActive(false);
     }
 }
