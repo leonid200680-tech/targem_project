@@ -5,46 +5,56 @@ using System.Collections.Generic;
 [RequireComponent(typeof(NavMeshAgent))]
 public class GhostChase : MonoBehaviour
 {
-    [Header("Настройки зрения")]
-    public float viewDistance = 10f;
-    public float viewAngle = 60f;
-    public LayerMask obstacleMask;
-
-    [Header("Патрулирование")]
+    [Header("Настройки патрулирования")]
     public List<Transform> waypoints;
     public float walkSpeed = 1.5f;
     public float chaseSpeed = 4f;
 
+    [Header("Зрение")]
+    public float viewDistance = 10f;
+    public float viewAngle = 60f;
+    public LayerMask obstacleMask;
+
     private NavMeshAgent agent;
+    private Animator anim;
     private Transform player;
+
     private bool canKill = false;
     private float forceChaseTimer = 0f;
-    private Vector3 lastKnownPosition; // Где она видела игрока в последний раз
+    private Vector3 lastKnownPosition = Vector3.zero;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        anim = GetComponent<Animator>();
+
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null) player = playerObj.transform;
 
-        agent.speed = walkSpeed;
+        if (agent != null) agent.speed = walkSpeed;
         GoToNextWaypoint();
     }
 
     void Update()
     {
-        if (player == null || !agent.enabled || !agent.isOnNavMesh) return;
+        if (player == null || agent == null || !agent.enabled) return;
 
-        // Если игрок спрятался в шкафу, она его не видит
+        // --- ПЕРЕДАЧА СКОРОСТИ В ANIMATOR ---
+        if (anim != null)
+        {
+            anim.SetFloat("Speed", agent.velocity.magnitude);
+        }
+
+        // Если игрок в шкафу
         if (HideableCloset.IsPlayerHidden)
         {
             agent.speed = walkSpeed;
             if (!agent.pathPending && agent.remainingDistance < 0.5f)
-                GoToNextWaypoint(); // Уходит гулять
+                GoToNextWaypoint();
             return;
         }
 
-        // Принудительная погоня
+        // Если идет принудительная погоня
         if (forceChaseTimer > 0)
         {
             forceChaseTimer -= Time.deltaTime;
@@ -53,26 +63,23 @@ public class GhostChase : MonoBehaviour
             return;
         }
 
-        // Обычная логика зрения
+        // Обычная логика
         bool canSeePlayer = CanSeePlayer();
         if (canSeePlayer)
         {
             agent.speed = chaseSpeed;
             agent.SetDestination(player.position);
-            lastKnownPosition = player.position; // Запоминаем, где он
+            lastKnownPosition = player.position;
         }
         else
         {
             agent.speed = walkSpeed;
 
-            // Если она не видит игрока, она идет к месту, где видела его в последний раз
             if (lastKnownPosition != Vector3.zero)
             {
                 agent.SetDestination(lastKnownPosition);
                 if (!agent.pathPending && agent.remainingDistance < 0.5f)
-                {
-                    lastKnownPosition = Vector3.zero; // Дошла, теперь можно гулять
-                }
+                    lastKnownPosition = Vector3.zero;
             }
             else if (!agent.pathPending && agent.remainingDistance < 0.5f)
             {
@@ -87,10 +94,22 @@ public class GhostChase : MonoBehaviour
         canKill = true;
     }
 
+    public void PlayScreamAnimation()
+    {
+        if (anim != null) anim.SetTrigger("Scream");
+    }
+
+    // ЭТОТ МЕТОД ИСКАЛ GHOSTKILLER
+    public bool CanKillPlayer()
+    {
+        return canKill;
+    }
+
     bool CanSeePlayer()
     {
         Vector3 dirToPlayer = player.position - transform.position;
         float distance = dirToPlayer.magnitude;
+
         if (distance > viewDistance) return false;
 
         float angle = Vector3.Angle(transform.forward, dirToPlayer);
@@ -109,6 +128,4 @@ public class GhostChase : MonoBehaviour
         int randomIndex = Random.Range(0, waypoints.Count);
         agent.SetDestination(waypoints[randomIndex].position);
     }
-
-    public bool CanKillPlayer() { return canKill; }
 }
