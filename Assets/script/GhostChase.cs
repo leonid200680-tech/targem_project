@@ -42,7 +42,9 @@ public class GhostChase : MonoBehaviour
         // --- ПЕРЕДАЧА СКОРОСТИ В ANIMATOR ---
         if (anim != null)
         {
-            anim.SetFloat("Speed", agent.velocity.magnitude);
+            float currentSpeed = agent.velocity.magnitude;
+            anim.SetFloat("Speed", currentSpeed);
+            // (Это единственная строка, которая нужна для Blend Tree)
         }
 
         // Если игрок в шкафу
@@ -63,7 +65,7 @@ public class GhostChase : MonoBehaviour
             return;
         }
 
-        // Обычная логика
+        // Обычная логика зрения
         bool canSeePlayer = CanSeePlayer();
         if (canSeePlayer)
         {
@@ -99,7 +101,6 @@ public class GhostChase : MonoBehaviour
         if (anim != null) anim.SetTrigger("Scream");
     }
 
-    // ЭТОТ МЕТОД ИСКАЛ GHOSTKILLER
     public bool CanKillPlayer()
     {
         return canKill;
