@@ -123,23 +123,26 @@ public class PlayerController : MonoBehaviour
 
     void HandleFootsteps()
     {
-        // Если мы на земле и движемся
-        if (controller.isGrounded && currentMoveVelocity.magnitude > 1f)
+        // Проверяем: на земле ли мы, движемся ли, и НЕ ИГРАЕТ ЛИ УЖЕ ЗВУК
+        if (controller.isGrounded && currentMoveVelocity.magnitude > 0.1f && !audioSource.isPlaying)
         {
             stepTimer -= Time.deltaTime;
 
             if (stepTimer <= 0f)
             {
                 PlayFootstepSound();
-                // Устанавливаем таймер в зависимости от того, бежим мы или идем
+                // Ставим таймер (Walk = 0.6, Run = 0.3)
                 stepTimer = isRunning ? runStepInterval : walkStepInterval;
             }
         }
-        else
+        else if (!controller.isGrounded || currentMoveVelocity.magnitude <= 0.1f)
         {
-            stepTimer = 0f; // Сбрасываем, если остановились
+            // Если стоим — сбрасываем таймер
+            stepTimer = 0f;
         }
     }
+
+   
 
     void PlayFootstepSound()
     {

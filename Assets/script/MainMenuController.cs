@@ -13,11 +13,14 @@ public class MainMenuController : MonoBehaviour
     [Header("Player")]
     public GameObject playerObject;
 
+    [Header("Cameras")]
+    public GameObject menuCamera; // <--- НОВОЕ: Камера для меню
+
     [Header("Audio")]
     public AudioSource menuMusic;
     public AudioSource gameMusic;       // Музыка в игре
     public AudioSource swingSound;      // Звук качелей
-    public AudioSource carouselSound;   // <--- НОВЫЙ СЛОТ: Звук карусели
+    public AudioSource carouselSound;   // Звук карусели
     public AudioSource generatorSound;  // Звук генератора
     public AudioListener menuAudioListener;
 
@@ -27,6 +30,10 @@ public class MainMenuController : MonoBehaviour
     {
         // 1. Выключаем игрока (чтобы его камера не мешала меню)
         if (playerObject != null) playerObject.SetActive(false);
+
+        // Включаем камеру меню
+        if (menuCamera != null) menuCamera.SetActive(true);
+
         if (videoBackground != null) videoBackground.SetActive(true);
 
         // 2. Настраиваем панели
@@ -49,7 +56,7 @@ public class MainMenuController : MonoBehaviour
         // На всякий случай выключаем игровые звуки при старте
         if (gameMusic != null) gameMusic.Stop();
         if (swingSound != null) swingSound.Stop();
-        if (carouselSound != null) carouselSound.Stop(); // <--- ВЫКЛЮЧАЕМ КАРУСЕЛЬ
+        if (carouselSound != null) carouselSound.Stop();
         if (generatorSound != null) generatorSound.Stop();
 
         // 4. Освобождаем мышку
@@ -75,13 +82,17 @@ public class MainMenuController : MonoBehaviour
 
         mainMenuPanel.SetActive(false);
         if (videoBackground != null) videoBackground.SetActive(false);
+
+        // ВЫКЛЮЧАЕМ КАМЕРУ МЕНЮ
+        if (menuCamera != null) menuCamera.SetActive(false);
+
         gameplayHUD.SetActive(true);
 
         // --- МУЗЫКА И ЗВУКИ ---
         if (menuMusic != null) menuMusic.Stop();       // Выключаем меню
         if (gameMusic != null) gameMusic.Play();       // Включаем музыку игры
         if (swingSound != null) swingSound.Play();     // Включаем качели
-        if (carouselSound != null) carouselSound.Play(); // <--- ВКЛЮЧАЕМ КАРУСЕЛЬ
+        if (carouselSound != null) carouselSound.Play(); // Включаем карусель
         if (generatorSound != null) generatorSound.Play(); // Включаем генератор
         // ----------------------
 
