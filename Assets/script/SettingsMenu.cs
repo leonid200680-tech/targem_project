@@ -1,97 +1,180 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
+// РџР°РЅРµР»СЊ РЅР°СЃС‚СЂРѕРµРє (РіР»Р°РІРЅРѕРµ РјРµРЅСЋ Рё РїР°СѓР·Р°): Р·РІСѓРє, СѓРїСЂР°РІР»РµРЅРёРµ, РіСЂР°С„РёРєР°.
+// Р—РЅР°С‡РµРЅРёСЏ С…СЂР°РЅСЏС‚СЃСЏ РІ PlayerPrefs С‡РµСЂРµР· GameSettings / AudioManager.
 public class SettingsMenu : MonoBehaviour
 {
-    [Header("Audio")]
+    [Header("Р—РІСѓРє")]
     [SerializeField] private Slider masterSlider;
     [SerializeField] private Slider musicSlider;
     [SerializeField] private Slider sfxSlider;
+    [SerializeField] private TMP_Text masterValue;
+    [SerializeField] private TMP_Text musicValue;
+    [SerializeField] private TMP_Text sfxValue;
 
-    [Header("Resolution")]
+    [Header("РЈРїСЂР°РІР»РµРЅРёРµ")]
+    [SerializeField] private Slider sensitivitySlider;
+    [SerializeField] private TMP_Text sensitivityValue;
+
+    [Header("Р“СЂР°С„РёРєР°")]
+    [SerializeField] private Slider brightnessSlider;
+    [SerializeField] private TMP_Text brightnessValue;
+    [SerializeField] private Dropdown qualityDropdown;
     [SerializeField] private Dropdown resolutionDropdown;
-    private Resolution[] resolutions;
+    [SerializeField] private Dropdown displayModeDropdown;
+    [SerializeField] private Dropdown vsyncDropdown;
+
+    private readonly List<Vector2Int> resolutions = new List<Vector2Int>();
+    private float saveAt = -1f;
 
     private void Start()
     {
-        // ==========================================
-        // 1. НАСТРОЙКА ЗВУКА
-        // ==========================================
-
-        // Загружаем сохранённые значения (по умолчанию 0.75, чтобы не орало на весь дом)
-        masterSlider.value = PlayerPrefs.GetFloat("MasterVolume", 0.75f);
-        musicSlider.value = PlayerPrefs.GetFloat("MusicVolume", 0.5f);
-        sfxSlider.value = PlayerPrefs.GetFloat("SFXVolume", 0.75f);
-
-        // Проверяем, существует ли AudioManager (защита от вылета, если его нет на сцене)
-        if (AudioManager.Instance != null)
-        {
-            // Сначала применяем загруженные настройки к самому аудиоменеджеру
-            AudioManager.Instance.SetMasterVolume(masterSlider.value);
-            AudioManager.Instance.SetMusicVolume(musicSlider.value);
-            AudioManager.Instance.SetSFXVolume(sfxSlider.value);
-
-            // Подписываемся на изменения ползунков
-            masterSlider.onValueChanged.AddListener(AudioManager.Instance.SetMasterVolume);
-            musicSlider.onValueChanged.AddListener(AudioManager.Instance.SetMusicVolume);
-            sfxSlider.onValueChanged.AddListener(AudioManager.Instance.SetSFXVolume);
-        }
-        else
-        {
-            Debug.LogWarning("AudioManager не найден на сцене! Ползунки звука не будут работать.");
-        }
-
-        // ==========================================
-        // 2. НАСТРОЙКА РАЗРЕШЕНИЯ ЭКРАНА
-        // ==========================================
-
-        resolutions = Screen.resolutions;
-        resolutionDropdown.ClearOptions();
-
-        int currentResolutionIndex = 0;
-        var options = new System.Collections.Generic.List<string>();
-
-        for (int i = 0; i < resolutions.Length; i++)
-        {
-            string option = resolutions[i].width + " x " + resolutions[i].height + " " + resolutions[i].refreshRate + "Hz";
-            options.Add(option);
-
-            // Сравниваем с текущим разрешением ОКНА (Screen.width), а не рабочего стола
-            if (resolutions[i].width == Screen.width &&
-                resolutions[i].height == Screen.height)
-            {
-                currentResolutionIndex = i;
-            }
-        }
-        resolutionDropdown.AddOptions(options);
-
-        // ЗАЩИТА ОТ ОШИБКИ: проверяем сохранённый индекс
-        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", currentResolutionIndex);
-
-        // Если сохранённый индекс больше, чем количество доступных разрешений — сбрасываем на текущее
-        if (savedIndex >= resolutions.Length)
-        {
-            savedIndex = currentResolutionIndex;
-        }
-
-        resolutionDropdown.value = savedIndex;
-        resolutionDropdown.RefreshShownValue();
-
-        // Подписываемся на изменение выбора разрешения
-        resolutionDropdown.onValueChanged.AddListener(SetResolution);
+        SetupAudio();
+        SetupControls();
+        SetupGraphics();
     }
 
-    public void SetResolution(int resolutionIndex)
+    private void Update()
     {
-        // Дополнительная защита от выхода за пределы массива
-        if (resolutionIndex < 0 || resolutionIndex >= resolutions.Length) return;
+        // РЎРѕС…СЂР°РЅСЏРµРј РЅР° РґРёСЃРє РЅРµ РЅР° РєР°Р¶РґРѕРµ РґРІРёР¶РµРЅРёРµ РїРѕР»Р·СѓРЅРєР°, Р° С‡СѓС‚СЊ РїРѕР·Р¶Рµ
+        if (saveAt > 0f && Time.unscaledTime >= saveAt)
+        {
+            saveAt = -1f;
+            GameSettings.Save();
+        }
+    }
 
-        Resolution resolution = resolutions[resolutionIndex];
-        Screen.SetResolution(resolution.width, resolution.height, Screen.fullScreen);
+    private void MarkDirty() => saveAt = Time.unscaledTime + 0.5f;
 
-        // Сохраняем выбор
-        PlayerPrefs.SetInt("ResolutionIndex", resolutionIndex);
-        PlayerPrefs.Save();
+    // ---------- Р—РІСѓРє ----------
+
+    private void SetupAudio()
+    {
+        BindSlider(masterSlider, masterValue, PlayerPrefs.GetFloat(GameSettings.MasterKey, GameSettings.DefaultMaster), Percent, v =>
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.SetMasterVolume(v);
+            else AudioListener.volume = v;
+        });
+        BindSlider(musicSlider, musicValue, PlayerPrefs.GetFloat(GameSettings.MusicKey, GameSettings.DefaultMusic), Percent, v =>
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.SetMusicVolume(v);
+        });
+        BindSlider(sfxSlider, sfxValue, PlayerPrefs.GetFloat(GameSettings.SFXKey, GameSettings.DefaultSFX), Percent, v =>
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.SetSFXVolume(v);
+        });
+    }
+
+    // ---------- РЈРїСЂР°РІР»РµРЅРёРµ ----------
+
+    private void SetupControls()
+    {
+        if (sensitivitySlider != null)
+        {
+            sensitivitySlider.minValue = 0.2f;
+            sensitivitySlider.maxValue = 6f;
+        }
+        BindSlider(sensitivitySlider, sensitivityValue, GameSettings.MouseSensitivity, v => v.ToString("0.0"), GameSettings.SetMouseSensitivity);
+    }
+
+    // ---------- Р“СЂР°С„РёРєР° ----------
+
+    private void SetupGraphics()
+    {
+        if (brightnessSlider != null)
+        {
+            brightnessSlider.minValue = -2f;
+            brightnessSlider.maxValue = 2f;
+        }
+        BindSlider(brightnessSlider, brightnessValue, GameSettings.Brightness, v => (v > 0.04f ? "+" : "") + v.ToString("0.0"), GameSettings.SetBrightness);
+
+        if (qualityDropdown != null)
+        {
+            var names = new List<string>();
+            foreach (var n in QualitySettings.names) names.Add(QualityName(n));
+            BindDropdown(qualityDropdown, names, GameSettings.Quality, GameSettings.SetQuality);
+        }
+
+        if (displayModeDropdown != null)
+            BindDropdown(displayModeDropdown, new List<string> { "РџРѕР»РЅС‹Р№ СЌРєСЂР°РЅ", "Р’ РѕРєРЅРµ" }, GameSettings.Fullscreen ? 0 : 1,
+                i => GameSettings.SetFullscreen(i == 0));
+
+        if (vsyncDropdown != null)
+            BindDropdown(vsyncDropdown, new List<string> { "Р’РєР»", "Р’С‹РєР»" }, GameSettings.VSync ? 0 : 1,
+                i => GameSettings.SetVSync(i == 0));
+
+        if (resolutionDropdown != null) SetupResolutions();
+    }
+
+    private void SetupResolutions()
+    {
+        // Р‘РµР· РїРѕРІС‚РѕСЂРѕРІ: РѕРґРЅРѕ СЂР°Р·СЂРµС€РµРЅРёРµ - РѕРґРЅР° СЃС‚СЂРѕРєР° (С‡Р°СЃС‚РѕС‚С‹ РЅРµ РІР°Р¶РЅС‹)
+        resolutions.Clear();
+        var options = new List<string>();
+        int current = 0;
+        foreach (var r in Screen.resolutions)
+        {
+            var size = new Vector2Int(r.width, r.height);
+            if (resolutions.Contains(size)) continue;
+            resolutions.Add(size);
+            options.Add(r.width + " x " + r.height);
+        }
+        for (int i = 0; i < resolutions.Count; i++)
+            if (resolutions[i].x == Screen.width && resolutions[i].y == Screen.height) current = i;
+
+        int saved = PlayerPrefs.GetInt("ResolutionIndex", current);
+        if (saved < 0 || saved >= resolutions.Count) saved = current;
+        BindDropdown(resolutionDropdown, options, saved, SetResolution);
+    }
+
+    public void SetResolution(int index)
+    {
+        if (index < 0 || index >= resolutions.Count) return;
+        Screen.SetResolution(resolutions[index].x, resolutions[index].y, Screen.fullScreenMode);
+        PlayerPrefs.SetInt("ResolutionIndex", index);
+    }
+
+    // ---------- Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅРѕРµ ----------
+
+    private void BindSlider(Slider slider, TMP_Text label, float value, System.Func<float, string> format, System.Action<float> apply)
+    {
+        if (slider == null) return;
+        slider.SetValueWithoutNotify(value);
+        if (label != null) label.text = format(value);
+        slider.onValueChanged.AddListener(v =>
+        {
+            apply(v);
+            if (label != null) label.text = format(v);
+            MarkDirty();
+        });
+    }
+
+    private void BindDropdown(Dropdown dropdown, List<string> options, int value, System.Action<int> apply)
+    {
+        dropdown.ClearOptions();
+        dropdown.AddOptions(options);
+        dropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, options.Count - 1));
+        dropdown.RefreshShownValue();
+        dropdown.onValueChanged.AddListener(i =>
+        {
+            apply(i);
+            MarkDirty();
+        });
+    }
+
+    private static string Percent(float v) => Mathf.RoundToInt(v * 100f) + "%";
+
+    private static string QualityName(string unityName)
+    {
+        switch (unityName)
+        {
+            case "High Fidelity": return "Р’С‹СЃРѕРєРѕРµ";
+            case "Balanced": return "РЎСЂРµРґРЅРµРµ";
+            case "Performant": return "РќРёР·РєРѕРµ";
+        }
+        return unityName;
     }
 }

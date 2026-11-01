@@ -16,8 +16,9 @@ public class InventorySlotUI : MonoBehaviour
         }
         else
         {
-            icon.enabled = true;
             icon.sprite = slot.item.icon;
+            icon.enabled = slot.item.icon != null; // без картинки - не белый квадрат
+            icon.preserveAspect = true;
             countText.text = slot.amount > 1 ? slot.amount.ToString() : "";
         }
     }

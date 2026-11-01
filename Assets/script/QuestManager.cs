@@ -18,6 +18,7 @@ public class QuestManager : MonoBehaviour
         BringBook,     // 6) Найди книгу и принеси
         PlaceStones,   // 7) Найди камни и выложи для ритуала
         LightCandles,  // 8) Зажги свечи
+        PlaceDoll,     // 9) Положи куклу наркомана в центр пентаграммы
         Done
     }
 
@@ -75,6 +76,9 @@ public class QuestManager : MonoBehaviour
             inventory = player.GetComponent<Inventory>();
         }
 
+        // Время прохождения считаем с момента, когда игрок впервые получил управление
+        if (playerReadyTime < 0f && player.enabled) playerReadyTime = Time.time;
+
         // Пока идёт диалог, шаги не засчитываем: пусть игрок дослушает
         if (DialogueManager.IsDialogueActive) return;
 
@@ -99,6 +103,7 @@ public class QuestManager : MonoBehaviour
                     || addict.currentState == NPCDialogueController.NPCState.ThirdFloorAmbush;
             case Step.PlaceStones: return StonesPlaced() >= StonesTotal();
             case Step.LightCandles: return CandlesLit() >= candles.Length;
+            case Step.PlaceDoll: return pentagram == null || !pentagram.NeedsDoll || pentagram.DollPlaced;
         }
         return false;
     }
@@ -163,6 +168,9 @@ public class QuestManager : MonoBehaviour
             case Step.BringBook: return "Найди книгу и принеси её наркоману.";
             case Step.PlaceStones: return "Найди камни и выложи их для ритуала";
             case Step.LightCandles: return "Зажги свечи";
+            case Step.PlaceDoll: return HasItem(ItemType.Doll)
+                ? "Положи куклу в центр пентаграммы."
+                : "Забери куклу наркомана и положи её в центр пентаграммы.";
             case Step.Done: return "Ритуал завершён.";
         }
         return "";
@@ -200,6 +208,8 @@ public class QuestManager : MonoBehaviour
     public void SetQuestStep(int step) => SetStep((Step)Mathf.Clamp(step, 0, (int)Step.Done));
 
     public int GetCurrentStep() => (int)currentStep;
+    // Сколько секунд прошло с момента, когда игрок получил управление
+    public float PlayTime => playerReadyTime < 0f ? 0f : Time.time - playerReadyTime;
     public Step CurrentStep => currentStep;
 
     public void OnTVWatched() { }      // телевизор засчитывается, когда пролистаны все камеры

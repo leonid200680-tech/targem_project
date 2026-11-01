@@ -95,8 +95,8 @@ public class PlayerInteraction : MonoBehaviour
             // 7. Проверка на ПЕНТАГРАММУ
             if (hit.collider.TryGetComponent(out Pentagram pentagram))
             {
-                ShowText("Нажмите E, чтобы положить камень");
-                if (Input.GetKeyDown(KeyCode.E)) pentagram.PlaceStone(playerInventory);
+                ShowText(pentagram.GetPrompt(playerInventory));
+                if (Input.GetKeyDown(KeyCode.E)) pentagram.Interact(playerInventory);
                 return;
             }
 
