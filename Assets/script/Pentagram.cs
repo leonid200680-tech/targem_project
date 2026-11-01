@@ -76,7 +76,7 @@ public class Pentagram : MonoBehaviour
     {
         ritualDone = true;
 
-        if (QuestManager.Instance != null) QuestManager.Instance.SetQuestStep(4);
+        if (QuestManager.Instance != null) QuestManager.Instance.OnRitualComplete();
 
         GhostChase realGhost = FindObjectOfType<GhostChase>();
         PlayerController pc = FindObjectOfType<PlayerController>();

@@ -37,4 +37,11 @@ public class InteractableDoor : MonoBehaviour
         isLocked = true;
         isOpen = false; // Принудительно закрываем дверь
     }
+
+    public void UnlockDoor()
+    {
+        isLocked = false;
+    }
+
+    public bool IsLocked => isLocked;
 }
