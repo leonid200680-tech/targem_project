@@ -24,6 +24,7 @@ public class DialogueManager : MonoBehaviour
 
     private void Awake()
     {
+        IsDialogueActive = false; // сброс после перезагрузки сцены
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 

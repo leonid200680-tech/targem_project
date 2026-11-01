@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PauseMenu : MonoBehaviour
 {
@@ -80,13 +81,9 @@ public class PauseMenu : MonoBehaviour
         GameIsPaused = false;
         AudioListener.pause = false;
 
-        pauseMenuPanel.SetActive(false);
-        mainMenuPanel.SetActive(true);
-
-        if (videoBackground != null) videoBackground.SetActive(true); 
-
-        GameObject menuMusic = GameObject.Find("MenuMusic");
-        if (menuMusic != null) menuMusic.GetComponent<AudioSource>().Play();
-        if (menuAudioListener != null) menuAudioListener.enabled = true;
+        // Меню и игра в одной сцене: перезагружаем её, чтобы следующая игра началась с нуля
+        HideableCloset.IsPlayerHidden = false;
+        PickupItem.stonesCollected = 0;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

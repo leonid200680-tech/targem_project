@@ -146042,6 +146042,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2117615619}
   - component: {fileID: 2117615618}
+  - component: {fileID: 2117615620}
   m_Layer: 0
   m_Name: WindZone
   m_TagString: Untagged
@@ -146078,6 +146079,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2117615620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2117615617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08e9db6a2fab48a4f886eaa6d4110adb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VegetationWind
+  strengthMultiplier: 1
 --- !u!1 &2118245072
 GameObject:
   m_ObjectHideFlags: 0
