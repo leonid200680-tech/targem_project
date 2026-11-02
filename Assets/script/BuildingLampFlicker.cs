@@ -56,11 +56,13 @@ public class BuildingLampFlicker : MonoBehaviour
 
         while (true)
         {
+            // Чем сильнее страх, тем чаще и дольше моргают лампы
+            float fear = FearMeter.Level;
             float wait = broken ? Random.Range(0.6f, 3f) : Random.Range(burstInterval.x, burstInterval.y);
-            yield return new WaitForSeconds(wait);
+            yield return new WaitForSeconds(wait * Mathf.Lerp(1f, 0.3f, fear));
 
             // Серия морганий
-            int flashes = Random.Range(burstFlashes.x, burstFlashes.y + 1);
+            int flashes = Random.Range(burstFlashes.x, burstFlashes.y + 1) + Mathf.RoundToInt(fear * 3f);
             for (int i = 0; i < flashes; i++)
             {
                 state = offLevel;
@@ -71,10 +73,10 @@ public class BuildingLampFlicker : MonoBehaviour
             state = 1f;
 
             // Иногда лампа гаснет надолго - и в темноте остаётся только тишина
-            if (Random.value < dropoutChance)
+            if (Random.value < dropoutChance + fear * 0.35f)
             {
                 state = 0f;
-                yield return new WaitForSeconds(Random.Range(dropoutLength.x, dropoutLength.y));
+                yield return new WaitForSeconds(Random.Range(dropoutLength.x, dropoutLength.y) * (1f + fear));
                 // Загорается неуверенно
                 for (int i = 0; i < 3; i++)
                 {

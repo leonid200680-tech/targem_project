@@ -44,4 +44,11 @@ public class InteractableDoor : MonoBehaviour
     }
 
     public bool IsLocked => isLocked;
+    public bool IsOpen => isOpen;
+
+    // Для шкафов: открыть/закрыть без переключения
+    public void SetOpen(bool open)
+    {
+        if (!isLocked) isOpen = open;
+    }
 }

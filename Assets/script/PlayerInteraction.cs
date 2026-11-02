@@ -31,12 +31,27 @@ public class PlayerInteraction : MonoBehaviour
             return;
         }
 
+        if (EvacuationPlan.IsOpen || HideableCloset.IsPlayerHidden)
+        {
+            HideText();
+            return;
+        }
+
         // Луч из центра экрана
         Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
             // 1. Проверка на ДВЕРЬ
+            // 0. Шкаф-укрытие: и дверцы, и корпус ведут в шкаф
+            HideableCloset closetHit = hit.collider.GetComponentInParent<HideableCloset>();
+            if (closetHit != null)
+            {
+                ShowText(closetHit.prompt);
+                if (Input.GetKeyDown(KeyCode.E)) closetHit.Interact();
+                return;
+            }
+
             if (hit.collider.TryGetComponent(out InteractableDoor door))
             {
                 ShowText(door.prompt);
@@ -105,6 +120,14 @@ public class PlayerInteraction : MonoBehaviour
             {
                 ShowText(candle.prompt);
                 if (Input.GetKeyDown(KeyCode.E)) candle.TryLight(playerInventory);
+                return;
+            }
+
+            // 10. План эвакуации на стене
+            if (hit.collider.TryGetComponent(out EvacuationPlan plan))
+            {
+                ShowText(plan.prompt);
+                if (Input.GetKeyDown(KeyCode.E)) plan.Interact();
                 return;
             }
 

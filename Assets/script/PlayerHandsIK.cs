@@ -1,9 +1,8 @@
 using UnityEngine;
-using UnityEngine.Serialization;
 
-// Правая рука модели держит выбранный предмет (зажигалку / фонарик) сбоку.
-// Предмет "приклеен" к ладони, а пальцы сгибаются, пока не упрутся в его габариты,
-// поэтому ни предмет, ни пальцы не проходят друг сквозь друга.
+// Правая рука модели держит выбранный предмет (зажигалку / фонарик) кулаком, как в жизни:
+// предмет лежит поперёк ладони у основания пальцев (его длинная сторона идёт от мизинца к указательному),
+// пальцы сгибаются вокруг него, пока не упрутся, большой палец ложится сверху.
 // Holder (LighterHolder / HandsHolder) включают скрипты Flashlight / LighterInHands,
 // его положение задаёт, где предмет окажется в кадре.
 [DefaultExecutionOrder(100)]
@@ -14,22 +13,21 @@ public class PlayerHandsIK : MonoBehaviour
     public class HeldItem
     {
         public GameObject holder;
-        [FormerlySerializedAs("grip")] public Transform item;
+        public Transform item;
 
-        [Tooltip("Куда смотрят выпрямленные пальцы (в осях камеры)")]
-        public Vector3 fingerDirection = Vector3.down;
-        [Tooltip("Куда смотрит ладонь, то есть в сторону предмета (в осях камеры)")]
-        public Vector3 palmNormal = Vector3.left;
-        [Tooltip("Точка хвата: смещение от центра предмета в метрах (в осях камеры)")]
-        public Vector3 gripPoint;
-        [Tooltip("Доворот предмета в руке вокруг его центра (градусы, в осях камеры)")]
-        public Vector3 itemEuler;
+        [Tooltip("Куда смотрит длинная сторона предмета - верх зажигалки, стекло фонарика (в осях камеры). " +
+                 "Этот конец торчит из кулака со стороны большого и указательного пальцев")]
+        public Vector3 itemAxis = Vector3.up;
+        [Tooltip("Длинная ось предмета в его собственных координатах (в сторону верха / стекла)")]
+        public Vector3 longAxisLocal = Vector3.forward;
+        [Tooltip("Насколько центр предмета сдвинут из кулака вдоль его оси, м (+ - к верху / стеклу)")]
+        public float gripAlong;
         [Tooltip("Круглый предмет (фонарик): считать цилиндром, а не коробкой")]
         public bool round;
-        [Tooltip("Насколько сгибать большой палец (0 - не трогать)")]
-        [Range(0, 1)] public float thumbCurl = 0.6f;
-        [Tooltip("Куда положить кончик большого пальца: смещение от точки хвата в метрах (в осях камеры). Ноль - просто сгибать")]
-        public Vector3 thumbTarget;
+        [Tooltip("Насколько сгибать большой палец")]
+        [Range(0, 1)] public float thumbCurl = 0.7f;
+        [Tooltip("Повернуть этот объект (свет фонарика) туда, куда смотрит камера")]
+        public Transform aimAtView;
 
         [HideInInspector] public Vector3 restLocalPos;
         [HideInInspector] public Quaternion restLocalRot;
@@ -45,8 +43,9 @@ public class PlayerHandsIK : MonoBehaviour
     public float raiseTime = 0.45f;
 
     [Header("Рука")]
-    public float palmSkin = 0.012f;    // от кости до поверхности ладони, м
+    public float palmSkin = 0.012f;     // от кости до поверхности ладони, м
     public float fingerRadius = 0.008f; // толщина пальца, м
+    [Range(0.3f, 1.2f)] public float gripAcrossPalm = 0.85f; // где по ладони лежит предмет: 0 - запястье, 1 - костяшки
     public float curlStep = 3f;
 
     [Header("Наклон тела к взгляду")]
@@ -57,11 +56,11 @@ public class PlayerHandsIK : MonoBehaviour
     private Transform[][] fingers; // указательный, средний, безымянный, мизинец
     private Transform[] thumb;
     private Vector3 fingerLocal, palmLocal, sideLocal; // оси кисти в её собственном пространстве
+    private Vector3 palmCenterLocal;
 
     private HeldItem current;
     private HeldItem last;
     private float weight;
-    private Quaternion desiredHandRot;
     private Quaternion ikGoalRot;
     // Разница между IK-целью гуманоида и реальным поворотом кости кисти (константа рига, калибруется на лету)
     private Quaternion goalToBone = Quaternion.identity;
@@ -99,6 +98,7 @@ public class PlayerHandsIK : MonoBehaviour
         Vector3 side = inv * (fingers[3][0].position - fingers[0][0].position);
         sideLocal = Vector3.ProjectOnPlane(side, fingerLocal).normalized;
         palmLocal = -Vector3.Cross(fingerLocal, sideLocal); // для правой руки
+        palmCenterLocal = inv * ((middleProximal.position - hand.position) * gripAcrossPalm);
 
         foreach (var it in items)
         {
@@ -129,27 +129,79 @@ public class PlayerHandsIK : MonoBehaviour
 
     float W => Mathf.SmoothStep(0f, 1f, weight);
 
-    // Матрица предмета в "кадровом" положении (как его расставили в holder)
-    Matrix4x4 RestMatrix(HeldItem it)
+    // Где предмет должен быть в кадре: центр предмета в положении, как его расставили в holder
+    Vector3 RestCenter(HeldItem it)
     {
-        Transform parent = it.item.parent;
-        Matrix4x4 m = parent.localToWorldMatrix * Matrix4x4.TRS(it.restLocalPos, it.restLocalRot, it.item.localScale);
-        if (it.itemEuler == Vector3.zero) return m;
-
-        // доворачиваем вокруг центра предмета, оси - камеры
-        Vector3 c = m.MultiplyPoint(it.meshBounds.center);
-        Quaternion cam = cameraTransform.rotation;
-        Quaternion r = cam * Quaternion.Euler(it.itemEuler) * Quaternion.Inverse(cam);
-        return Matrix4x4.TRS(c, r, Vector3.one) * Matrix4x4.TRS(-c, Quaternion.identity, Vector3.one) * m;
+        Matrix4x4 m = it.item.parent.localToWorldMatrix * Matrix4x4.TRS(it.restLocalPos, it.restLocalRot, it.item.localScale);
+        return m.MultiplyPoint(it.meshBounds.center);
     }
 
+    // Где держим локоть: вниз и наружу, как у человека, который держит что-то перед собой
+    Vector3 ElbowHint() =>
+        animator.GetBoneTransform(HumanBodyBones.RightUpperArm).position + cameraTransform.rotation * new Vector3(0.3f, -0.45f, 0.05f);
+
+    // Кисть: от мизинца к указательному - вдоль оси предмета. Пястье продолжает предплечье настолько,
+    // насколько позволяет ось предмета, - запястье гнётся ровно на нужный угол, а не выворачивается.
+    // Ладонь при этом сама оказывается обращённой к предмету.
     Quaternion DesiredHandRotation(HeldItem it)
     {
-        Quaternion cam = cameraTransform.rotation;
-        Vector3 f = cam * it.fingerDirection.normalized;
-        Vector3 n = cam * it.palmNormal.normalized;
-        return Quaternion.LookRotation(f, n) * Quaternion.Inverse(Quaternion.LookRotation(fingerLocal, palmLocal));
+        Vector3 axis = (cameraTransform.rotation * it.itemAxis).normalized;
+        Vector3 forearm = RestCenter(it) - ElbowHint();
+        Vector3 metacarpal = Vector3.ProjectOnPlane(forearm, axis);
+        if (metacarpal.sqrMagnitude < 1e-6f) metacarpal = Vector3.ProjectOnPlane(cameraTransform.forward, axis);
+        return Quaternion.LookRotation(axis, metacarpal) * Quaternion.Inverse(Quaternion.LookRotation(-sideLocal, fingerLocal));
     }
+
+    // Поворот предмета: длинная ось - по оси хвата, плоская сторона - к ладони
+    Quaternion ItemRotation(HeldItem it, Quaternion handRot)
+    {
+        Vector3 axis = handRot * -sideLocal;
+        Vector3 palm = handRot * palmLocal;
+        Vector3 thin = ThinAxisLocal(it);
+        return Quaternion.LookRotation(axis, -palm) * Quaternion.Inverse(Quaternion.LookRotation(it.longAxisLocal.normalized, thin));
+    }
+
+    // Самая тонкая ось предмета (кроме длинной) - этой стороной он лежит на ладони
+    static Vector3 ThinAxisLocal(HeldItem it)
+    {
+        Vector3 e = Vector3.Scale(it.meshBounds.extents, it.item.lossyScale);
+        Vector3 l = it.longAxisLocal.normalized;
+        Vector3 best = Vector3.up;
+        float min = float.MaxValue;
+        foreach (var a in new[] { Vector3.right, Vector3.up, Vector3.forward })
+        {
+            if (Mathf.Abs(Vector3.Dot(a, l)) > 0.9f) continue;
+            float size = Mathf.Abs(Vector3.Dot(e, a));
+            if (size < min) { min = size; best = a; }
+        }
+        return best;
+    }
+
+    // Половина толщины предмета в сторону ладони
+    float HalfThickness(HeldItem it)
+    {
+        Vector3 e = Vector3.Scale(it.meshBounds.extents, it.item.lossyScale);
+        Vector3 l = it.longAxisLocal.normalized;
+        float a = 0f, b = float.MaxValue;
+        foreach (var ax in new[] { Vector3.right, Vector3.up, Vector3.forward })
+        {
+            if (Mathf.Abs(Vector3.Dot(ax, l)) > 0.9f) continue;
+            float size = Mathf.Abs(Vector3.Dot(e, ax));
+            a = Mathf.Max(a, size);
+            b = Mathf.Min(b, size);
+        }
+        return it.round ? (a + b) * 0.5f : b;
+    }
+
+    // Смещение центра предмета от кисти при заданном повороте кисти
+    Vector3 CenterFromWrist(HeldItem it, Quaternion handRot)
+    {
+        Vector3 palm = handRot * palmLocal;
+        Vector3 axis = handRot * -sideLocal;
+        return handRot * palmCenterLocal + palm * (palmSkin + HalfThickness(it)) + axis * it.gripAlong;
+    }
+
+    // ---------- Расстояние до предмета ----------
 
     // Ось и радиус цилиндра, вписанного в бокс (ось - самая длинная сторона)
     static void Cylinder(Matrix4x4 m, Bounds b, out Vector3 center, out Vector3 halfAxis, out float radius)
@@ -162,20 +214,6 @@ public class PlayerHandsIK : MonoBehaviour
         if (x.magnitude >= y.magnitude && x.magnitude >= z.magnitude) { halfAxis = x; radius = (y.magnitude + z.magnitude) * 0.5f; }
         else if (y.magnitude >= z.magnitude) { halfAxis = y; radius = (x.magnitude + z.magnitude) * 0.5f; }
         else { halfAxis = z; radius = (x.magnitude + y.magnitude) * 0.5f; }
-    }
-
-    // Половина толщины предмета вдоль направления dir
-    float HalfThickness(Matrix4x4 m, Bounds b, Vector3 dir)
-    {
-        if (last != null && last.round)
-        {
-            Cylinder(m, b, out _, out Vector3 halfAxis, out float radius);
-            return radius + Mathf.Abs(Vector3.Dot(dir, halfAxis.normalized)) * halfAxis.magnitude;
-        }
-        Vector3 e = b.extents;
-        return Mathf.Abs(Vector3.Dot(dir, m.MultiplyVector(new Vector3(e.x, 0, 0))))
-             + Mathf.Abs(Vector3.Dot(dir, m.MultiplyVector(new Vector3(0, e.y, 0))))
-             + Mathf.Abs(Vector3.Dot(dir, m.MultiplyVector(new Vector3(0, 0, e.z))));
     }
 
     // Расстояние от точки до предмета (отрицательное - внутри)
@@ -196,6 +234,8 @@ public class PlayerHandsIK : MonoBehaviour
         return inside ? -d : d;
     }
 
+    // ---------- IK ----------
+
     void OnAnimatorIK(int layerIndex)
     {
         if (cameraTransform == null) return;
@@ -210,26 +250,18 @@ public class PlayerHandsIK : MonoBehaviour
         animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, w);
         if (last == null || w <= 0f) return;
 
-        // Локоть вниз и наружу, как у человека, который держит что-то перед собой
-        Vector3 shoulder = animator.GetBoneTransform(HumanBodyBones.RightUpperArm).position;
-        animator.SetIKHintPosition(AvatarIKHint.RightElbow,
-            shoulder + cameraTransform.rotation * new Vector3(0.3f, -0.45f, 0.05f));
+        animator.SetIKHintPosition(AvatarIKHint.RightElbow, ElbowHint());
 
-        // Где должна оказаться кисть, чтобы ладонь легла на предмет в его кадровом положении
-        desiredHandRot = DesiredHandRotation(last);
-        ikGoalRot = desiredHandRot * Quaternion.Inverse(goalToBone);
+        // Кисть ставим так, чтобы предмет в кулаке оказался там, где его расставили в holder
+        Quaternion handRot = DesiredHandRotation(last);
+        ikGoalRot = handRot * Quaternion.Inverse(goalToBone);
         animator.SetIKRotation(AvatarIKGoal.RightHand, ikGoalRot);
-        Matrix4x4 m = RestMatrix(last);
-        Vector3 n = desiredHandRot * palmLocal;
-        Vector3 grip = m.MultiplyPoint(last.meshBounds.center) + cameraTransform.rotation * last.gripPoint;
-        Vector3 palmSurface = grip - n * HalfThickness(m, last.meshBounds, n);
-        Vector3 palmCenterFromWrist = desiredHandRot * (Quaternion.Inverse(hand.rotation) * ((middleProximal.position - hand.position) * 0.5f)) + n * palmSkin;
-        animator.SetIKPosition(AvatarIKGoal.RightHand, palmSurface - palmCenterFromWrist);
+        animator.SetIKPosition(AvatarIKGoal.RightHand, RestCenter(last) - CenterFromWrist(last, handRot));
     }
 
     void LateUpdate()
     {
-        if (last == null || cameraTransform == null) return;
+        if (last == null || cameraTransform == null || fingers == null) return;
         float w = W;
         if (w <= 0f) return;
 
@@ -237,43 +269,39 @@ public class PlayerHandsIK : MonoBehaviour
         if (w > 0.99f)
             goalToBone = Quaternion.Slerp(goalToBone, Quaternion.Inverse(ikGoalRot) * hand.rotation, 0.5f);
 
-        desiredHandRot = DesiredHandRotation(last);
-        hand.rotation = Quaternion.Slerp(hand.rotation, desiredHandRot, w);
+        hand.rotation = Quaternion.Slerp(hand.rotation, DesiredHandRotation(last), w);
 
         if (current == null) return; // предмет уже убран, рука просто опускается
 
-        // Предмет жёстко привязан к ладони
-        Matrix4x4 rest = RestMatrix(last);
-        Quaternion restRot = rest.rotation;
-        Quaternion relRot = Quaternion.Inverse(desiredHandRot) * restRot;
+        // Предмет лежит в кулаке
         Transform item = last.item;
-        item.rotation = hand.rotation * relRot;
+        item.rotation = ItemRotation(last, hand.rotation);
+        Vector3 center = hand.position + CenterFromWrist(last, hand.rotation);
+        item.position += center - item.TransformPoint(last.meshBounds.center);
 
-        Vector3 n = hand.rotation * palmLocal;
-        Vector3 palmSurface = hand.position + (middleProximal.position - hand.position) * 0.5f + n * palmSkin;
-        Vector3 gripOffset = hand.rotation * (Quaternion.Inverse(desiredHandRot) * (cameraTransform.rotation * last.gripPoint));
-        Vector3 gripNow = item.TransformPoint(last.meshBounds.center) + gripOffset;
-        Matrix4x4 m = item.localToWorldMatrix;
-        Vector3 target = palmSurface + n * HalfThickness(m, last.meshBounds, n);
-        item.position += target - gripNow;
+        if (last.aimAtView != null) last.aimAtView.rotation = cameraTransform.rotation;
 
-        // Пальцы обхватывают предмет
+        // Пальцы обхватывают предмет, большой палец ложится сверху
         Vector3 curlAxis = hand.rotation * sideLocal;
-        foreach (var chain in fingers) Curl(chain, curlAxis, 100f, item, last.meshBounds);
-        if (last.thumbTarget != Vector3.zero)
-            ReachThumb(target + hand.rotation * (Quaternion.Inverse(desiredHandRot) * (cameraTransform.rotation * last.thumbTarget)));
-        else if (last.thumbCurl > 0f)
-            Curl(thumb, hand.rotation * fingerLocal, 70f * last.thumbCurl, item, last.meshBounds);
-
-        // Большой палец гнётся сложнее остальных: если он всё же задел предмет - выталкиваем
-        PushOut(thumb, new[] { hand.rotation * fingerLocal, hand.rotation * sideLocal, hand.rotation * palmLocal }, item, last.meshBounds);
+        foreach (var chain in fingers) Curl(chain, curlAxis, 110f, item, last.meshBounds);
+        if (last.thumbCurl > 0f)
+        {
+            // Большой палец ложится поверх согнутых пальцев - на среднюю фалангу указательного/среднего,
+            // как у сжатого кулака
+            Vector3 itemCenter = item.TransformPoint(last.meshBounds.center);
+            Vector3 itemAxis = hand.rotation * -sideLocal;
+            Vector3 rest = Vector3.Lerp(fingers[0][1].position, fingers[1][1].position, last.thumbCurl * 0.6f);
+            Vector3 outward = Vector3.ProjectOnPlane(rest - itemCenter, itemAxis).normalized;
+            ReachThumb(rest + outward * fingerRadius * 1.6f);
+            PushOut(thumb, new[] { hand.rotation * fingerLocal, hand.rotation * sideLocal, hand.rotation * palmLocal }, item, last.meshBounds);
+        }
     }
 
-    // Простой CCD: тянем кончик большого пальца к точке на предмете
+    // Простой CCD: тянем кончик большого пальца к точке
     void ReachThumb(Vector3 targetPoint)
     {
         if (thumb[0] == null || thumb[1] == null || thumb[2] == null) return;
-        for (int iter = 0; iter < 6; iter++)
+        for (int iter = 0; iter < 8; iter++)
             for (int s = 2; s >= 0; s--)
             {
                 Transform bone = thumb[s];
@@ -282,14 +310,13 @@ public class PlayerHandsIK : MonoBehaviour
                 Quaternion rot = Quaternion.FromToRotation(toTip, toTarget);
                 rot.ToAngleAxis(out float angle, out Vector3 axis);
                 if (angle > 180f) angle -= 360f;
-                bone.rotation = Quaternion.AngleAxis(Mathf.Clamp(angle, -25f, 25f), axis) * bone.rotation;
+                bone.rotation = Quaternion.AngleAxis(Mathf.Clamp(angle, -20f, 20f), axis) * bone.rotation;
             }
     }
 
     void PushOut(Transform[] chain, Vector3[] axes, Transform item, Bounds b)
     {
         if (chain[0] == null) return;
-        // сначала двигаем основание пальца, потом среднюю фалангу
         for (int s = 0; s < 2; s++)
         {
             Transform bone = chain[s];

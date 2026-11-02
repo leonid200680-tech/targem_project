@@ -4,6 +4,8 @@ using UnityEngine.UI;
 
 // Телевизор с камерами наблюдения. По E включается (сначала барахлит), дальше A/D листают
 // камеры, E выключает. Интерфейс "монитора охраны" собирается из кода.
+// Пугалки: в камере может мелькнуть бабка (в следующий раз - уже у самой камеры),
+// а сквозь помехи иногда проступают надписи и часы сбиваются на 03:33.
 public class InteractableTV : MonoBehaviour
 {
     public string prompt = "Нажмите E, чтобы включить телевизор";
@@ -22,6 +24,21 @@ public class InteractableTV : MonoBehaviour
     public float switchNoiseTime = 0.35f;    // помехи при переключении камеры
     public Vector2 glitchInterval = new Vector2(3f, 8f);
     public float secondsToCountCamera = 1.2f;
+
+    [Tooltip("Свет, который выключается, пока смотрят камеры (общий заполняющий свет пересвечивает ночной режим). " +
+             "Если пусто - ищется объект \"Global Fill Light\"")]
+    public Light[] hideWhileViewing;
+
+    [Header("Пугалки на камерах")]
+    [Tooltip("Кого показывать в камерах (если пусто - бабка из HallucinationManager)")]
+    public GameObject apparitionSource;
+    [Tooltip("Шанс, что в камере, куда смотрят впервые, кто-то появится")]
+    [Range(0, 1)] public float apparitionChance = 0.5f;
+    [Tooltip("Сколько раз за игру: в первый раз далеко, в следующий - уже у самой камеры")]
+    public int maxApparitions = 2;
+    public string[] creepyMessages = { "ОБЕРНИСЬ", "ОНА ЗДЕСЬ", "ТЫ НЕ ОДИН", "ПОМОГИ МНЕ", "ОНА ИДЁТ" };
+    [Tooltip("Шанс, что при потере сигнала вместо \"НЕТ СИГНАЛА\" мелькнёт надпись")]
+    [Range(0, 1)] public float creepyMessageChance = 0.25f;
 
     public bool IsViewing { get; private set; }
     public int CameraCount => cameras != null ? cameras.Length : 0;
@@ -48,10 +65,23 @@ public class InteractableTV : MonoBehaviour
     private Text recText;
     private Text noSignalText;
     private AudioSource hiss;
+    private AudioSource sting;
+
+    // Пугалки
+    private GameObject apparition;
+    private int apparitionsShown;
+    private int[] hauntCount;          // сколько раз в камере уже кто-то был
+    private float apparitionAfter = -1f;   // через сколько секунд просмотра появится (-1 - не запланировано)
+    private float apparitionUntil;
+    private string message;
+    private float messageUntil;
 
     void Start()
     {
         seen = new bool[CameraCount];
+        hauntCount = new int[CameraCount];
+        apparition = MakeApparition();    // заранее, пока настоящая бабка ещё выключена
+        HideApparition();
         BuildOverlay();
         overlay.gameObject.SetActive(false);
     }
@@ -80,6 +110,7 @@ public class InteractableTV : MonoBehaviour
         }
 
         overlay.gameObject.SetActive(true);
+        SetFillLights(false);
         if (powerSound != null) AudioSource.PlayClipAtPoint(powerSound, transform.position);
 
         // Телек барахлит: сначала только помехи и "НЕТ СИГНАЛА"
@@ -92,8 +123,11 @@ public class InteractableTV : MonoBehaviour
     void TurnOff()
     {
         IsViewing = false;
+        HideApparition();
+        apparitionAfter = -1f;
         foreach (var c in cameras) if (c != null) c.SetLive(false, null);
         overlay.gameObject.SetActive(false);
+        SetFillLights(true);
         hiss.Stop();
         if (player != null) player.enabled = true;
         if (powerSound != null) AudioSource.PlayClipAtPoint(powerSound, transform.position);
@@ -110,6 +144,105 @@ public class InteractableTV : MonoBehaviour
         var cam = cameras[current];
         labelText.text = cam != null ? $"{cam.label}   {cam.location}" : "";
         noiseUntil = Mathf.Max(noiseUntil, Time.unscaledTime + switchNoiseTime);
+
+        // Пугалка: в новой камере - с шансом, в камере, где уже кто-то мелькал, - обязательно (и ближе)
+        HideApparition();
+        apparitionAfter = -1f;
+        if (apparitionsShown < maxApparitions && (hauntCount[current] > 0 || UnityEngine.Random.value < apparitionChance))
+            apparitionAfter = UnityEngine.Random.Range(1.5f, 3.5f);
+    }
+
+    void UpdateApparition(float t)
+    {
+        if (apparition != null && apparition.activeSelf)
+        {
+            if (t < apparitionUntil) return;
+            // Исчезает вместе с помехой
+            HideApparition();
+            noiseUntil = t + UnityEngine.Random.Range(0.3f, 0.6f);
+            jitterUntil = noiseUntil;
+            return;
+        }
+
+        if (apparitionAfter < 0f || watchTime < apparitionAfter) return;
+        apparitionAfter = -1f;
+
+        float dist = hauntCount[current] == 0 ? UnityEngine.Random.Range(7f, 10f) : 3f;
+        if (!PlaceApparition(cameras[current], dist)) return;
+        apparition.SetActive(true);
+        hauntCount[current]++;
+        apparitionsShown++;
+        apparitionUntil = t + (hauntCount[current] > 1 ? UnityEngine.Random.Range(0.6f, 1f) : UnityEngine.Random.Range(1.2f, 2f));
+        jitterUntil = t + 0.15f;
+        if (sting != null) sting.Play();
+    }
+
+    // Ставит фигуру перед камерой: на пол, в кадре и чтобы ничего не загораживало
+    bool PlaceApparition(CCTVCamera cam, float dist)
+    {
+        if (cam == null) return false;
+        if (apparition == null) apparition = MakeApparition();
+        if (apparition == null) return false;
+
+        Transform t = cam.transform;
+        Vector3 fwd = t.forward; fwd.y = 0f;
+        if (fwd.sqrMagnitude < 1e-4f) return false;
+        fwd.Normalize();
+        Vector3 side = Vector3.Cross(Vector3.up, fwd);
+
+        for (float d = dist; d >= 2.5f; d -= 1f)
+        {
+            Vector3 p = t.position + fwd * d + side * UnityEngine.Random.Range(-0.6f, 0.6f);
+            if (!Physics.Raycast(p, Vector3.down, out RaycastHit hit, 8f, ~0, QueryTriggerInteraction.Ignore)) continue;
+            if (hit.point.y > t.position.y - 1.5f) continue;
+            Vector3 chest = hit.point + Vector3.up * 1.2f;
+            if (Physics.Linecast(t.position, chest, ~0, QueryTriggerInteraction.Ignore)) continue;
+            Vector3 vp = cam.Cam.WorldToViewportPoint(chest);
+            if (vp.z <= 0f || vp.x < 0.15f || vp.x > 0.85f || vp.y < 0.1f || vp.y > 0.9f) continue;
+
+            Vector3 look = t.position - hit.point; look.y = 0f;
+            apparition.transform.SetPositionAndRotation(hit.point, Quaternion.LookRotation(look));
+            return true;
+        }
+        return false;
+    }
+
+    // Копия бабки без поведения: только модель и анимация
+    GameObject MakeApparition()
+    {
+        var src = apparitionSource;
+        if (src == null)
+        {
+            var hm = FindAnyObjectByType<HallucinationManager>(FindObjectsInactive.Include);
+            if (hm != null) src = hm.realGhost;
+        }
+        if (src == null) return null;
+
+        bool wasActive = src.activeSelf;
+        src.SetActive(false);              // копия создаётся выключенной, её скрипты не успеют запуститься
+        var go = Instantiate(src);
+        src.SetActive(wasActive);
+        go.name = "CCTV Apparition";
+        foreach (var b in go.GetComponentsInChildren<MonoBehaviour>(true)) DestroyImmediate(b);
+        foreach (var a in go.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true)) DestroyImmediate(a);
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) DestroyImmediate(c);
+        foreach (var s in go.GetComponentsInChildren<AudioSource>(true)) DestroyImmediate(s);
+        return go;
+    }
+
+    void HideApparition()
+    {
+        if (apparition != null) apparition.SetActive(false);
+    }
+
+    void SetFillLights(bool on)
+    {
+        if (hideWhileViewing == null || hideWhileViewing.Length == 0)
+        {
+            var go = GameObject.Find("Global Fill Light");
+            hideWhileViewing = go != null ? go.GetComponents<Light>() : new Light[0];
+        }
+        foreach (var l in hideWhileViewing) if (l != null) l.enabled = on;
     }
 
     void ScheduleGlitch() => nextGlitch = Time.unscaledTime + UnityEngine.Random.Range(glitchInterval.x, glitchInterval.y);
@@ -131,7 +264,17 @@ public class InteractableTV : MonoBehaviour
         // Случайные сбои: короткая потеря сигнала или дёргание картинки
         if (t >= nextGlitch)
         {
-            if (UnityEngine.Random.value < 0.4f) noiseUntil = t + UnityEngine.Random.Range(0.15f, 0.5f);
+            if (UnityEngine.Random.value < 0.4f)
+            {
+                noiseUntil = t + UnityEngine.Random.Range(0.15f, 0.5f);
+                // Иногда сквозь помехи проступает надпись
+                if (CamerasSeen > 0 && creepyMessages.Length > 0 && UnityEngine.Random.value < creepyMessageChance)
+                {
+                    message = creepyMessages[UnityEngine.Random.Range(0, creepyMessages.Length)];
+                    noiseUntil = t + UnityEngine.Random.Range(0.6f, 1f);
+                    messageUntil = noiseUntil;
+                }
+            }
             else jitterUntil = t + UnityEngine.Random.Range(0.1f, 0.3f);
             ScheduleGlitch();
         }
@@ -147,6 +290,7 @@ public class InteractableTV : MonoBehaviour
                 CamerasSeen++;
             }
         }
+        UpdateApparition(t);
 
         AnimateOverlay(t, noSignal);
     }
@@ -158,8 +302,11 @@ public class InteractableTV : MonoBehaviour
         float noiseAlpha = noSignal ? 0.95f : 0.07f + 0.04f * Mathf.PerlinNoise(t * 3f, 0f);
         noise.color = new Color(1f, 1f, 1f, noiseAlpha);
         feed.color = noSignal ? new Color(feedTint.r, feedTint.g, feedTint.b, 0.25f) : feedTint;
-        noSignalText.enabled = noSignal && Mathf.Repeat(t, 0.8f) < 0.55f;
-        hiss.volume = noSignal ? 0.35f : 0.04f;
+        bool showMessage = noSignal && t < messageUntil;
+        noSignalText.text = showMessage ? message : "НЕТ СИГНАЛА";
+        noSignalText.color = showMessage ? new Color(0.85f, 0.05f, 0.04f, 0.95f) : new Color(0.92f, 0.95f, 0.9f, 0.9f);
+        noSignalText.enabled = showMessage || (noSignal && Mathf.Repeat(t, 0.8f) < 0.55f);
+        hiss.volume = noSignal ? 0.5f : 0.05f;
 
         // Дёргание по горизонтали и бегущие полосы развёртки
         float jitter = t < jitterUntil ? UnityEngine.Random.Range(-14f, 14f) : 0f;
@@ -168,7 +315,8 @@ public class InteractableTV : MonoBehaviour
 
         recText.enabled = Mathf.Repeat(t, 1.2f) < 0.8f;
         DateTime now = DateTime.Today.AddHours(3).AddMinutes(12).AddSeconds(Time.time);
-        timeText.text = now.ToString("dd-MM-yyyy  HH:mm:ss");
+        // Пока мелькает надпись, часы сбиваются на 03:33:33
+        timeText.text = t < messageUntil ? now.ToString("dd-MM-yyyy") + "  03:33:33" : now.ToString("dd-MM-yyyy  HH:mm:ss");
     }
 
     void OnDisable()
@@ -179,6 +327,7 @@ public class InteractableTV : MonoBehaviour
     void OnDestroy()
     {
         if (feedTexture != null) feedTexture.Release();
+        if (apparition != null) Destroy(apparition);
         if (overlay != null) Destroy(overlay.gameObject);
     }
 
@@ -241,6 +390,35 @@ public class InteractableTV : MonoBehaviour
         hiss.spatialBlend = 0f;
         hiss.playOnAwake = false;
         hiss.ignoreListenerPause = true;
+
+        sting = canvasGo.AddComponent<AudioSource>();
+        sting.clip = MakeStingClip();
+        sting.spatialBlend = 0f;
+        sting.playOnAwake = false;
+        sting.volume = 1f;
+    }
+
+    // Глухой удар с нарастающим скрежетом помех - когда в камере кто-то появляется
+    static AudioClip MakeStingClip()
+    {
+        const int rate = 22050;
+        int n = (int)(rate * 1.6f);
+        var data = new float[n];
+        var rnd = new System.Random(11);
+        float lp = 0f, phase = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            float boom = Mathf.Sin(phase) * Mathf.Exp(-t * 2.2f) * Mathf.Clamp01(t * 60f);
+            phase += 2f * Mathf.PI * Mathf.Lerp(62f, 38f, Mathf.Clamp01(t / 1.2f)) / rate;
+            float white = (float)rnd.NextDouble() * 2f - 1f;
+            lp += (white - lp) * 0.35f;
+            float scrape = lp * Mathf.Sin(Mathf.Clamp01(t / 1.6f) * Mathf.PI) * (0.6f + 0.4f * Mathf.Sin(t * 70f));
+            data[i] = Mathf.Clamp(boom * 0.8f + scrape * 0.35f, -1f, 1f);
+        }
+        var clip = AudioClip.Create("CCTV Sting", n, 1, rate, false);
+        clip.SetData(data, 0);
+        return clip;
     }
 
     static T NewChild<T>(string name, Transform parent) where T : Graphic

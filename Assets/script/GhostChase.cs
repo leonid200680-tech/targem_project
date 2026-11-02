@@ -96,6 +96,20 @@ public class GhostChase : MonoBehaviour
         canKill = true;
     }
 
+    // После того как игрок пришёл в себя: бабка забывает о нём и уходит
+    // к самой дальней от него точке патруля
+    public void SendFarFrom(Vector3 point)
+    {
+        forceChaseTimer = 0f;
+        lastKnownPosition = Vector3.zero;
+        if (agent == null) agent = GetComponent<NavMeshAgent>();
+        if (waypoints == null || waypoints.Count == 0 || agent == null) return;
+        Transform far = waypoints[0];
+        foreach (var w in waypoints)
+            if (w != null && Vector3.Distance(w.position, point) > Vector3.Distance(far.position, point)) far = w;
+        if (agent.enabled) agent.Warp(far.position);
+        else transform.position = far.position;
+    }
     public void PlayScreamAnimation()
     {
         if (anim != null) anim.SetTrigger("Scream");

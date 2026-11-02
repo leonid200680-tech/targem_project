@@ -86,6 +86,11 @@ public class MainMenuController : MonoBehaviour
         // ВЫКЛЮЧАЕМ КАМЕРУ МЕНЮ
         if (menuCamera != null) menuCamera.SetActive(false);
 
+        // Слушатель меню выключаем: в игре слушает только камера игрока, иначе 3D-звуки считаются не от игрока
+        // (поле menuAudioListener в сцене указывает на камеру игрока, поэтому берём слушатель с этого объекта)
+        var ownListener = GetComponent<AudioListener>();
+        if (ownListener != null) ownListener.enabled = false;
+
         gameplayHUD.SetActive(true);
 
         // --- МУЗЫКА И ЗВУКИ ---

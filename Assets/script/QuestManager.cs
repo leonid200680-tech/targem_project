@@ -164,13 +164,13 @@ public class QuestManager : MonoBehaviour
             case Step.WatchCameras: return "Телевизор барахлит. Включи его и проверь камеры";
             case Step.TakeItems: return "Забери фонарик и зажигалку";
             case Step.ThirdFloor: return "Посмотри, что творится на 3 этаже здания.";
-            case Step.SecondFloor: return "Обойди 2 этаж. Прислушайся...";
-            case Step.BringBook: return "Найди книгу и принеси её наркоману.";
+            case Step.SecondFloor: return "Спустись на 2 этаж. Прислушайся...";
+            case Step.BringBook: return "Найди книгу и принеси её сектанту.";
             case Step.PlaceStones: return "Найди камни и выложи их для ритуала";
             case Step.LightCandles: return "Зажги свечи";
             case Step.PlaceDoll: return HasItem(ItemType.Doll)
                 ? "Положи куклу в центр пентаграммы."
-                : "Забери куклу наркомана и положи её в центр пентаграммы.";
+                : "Забери куклу сектанта и положи её в центр пентаграммы.";
             case Step.Done: return "Ритуал завершён.";
         }
         return "";

@@ -10,7 +10,8 @@ public class PlayerController : MonoBehaviour
     [Header("Настройки скорости")]
     public float walkSpeed = 4f;
     public float runSpeed = 7f;
-    public float acceleration = 10f;
+    public float acceleration = 30f;   // разгон, м/с за секунду
+    public float deceleration = 45f;   // торможение: отпустил клавишу - почти сразу стоит
 
     [Header("Прыжок и гравитация")]
     public float gravity = -15f;
@@ -84,8 +85,9 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement()
     {
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        // Raw: без встроенного сглаживания ввода, из-за него игрок "доезжал" после отпускания клавиши
+        float x = Input.GetAxisRaw("Horizontal");
+        float z = Input.GetAxisRaw("Vertical");
 
         bool wantsToRun = Input.GetKey(KeyCode.LeftShift) && z > 0;
 
@@ -105,7 +107,8 @@ public class PlayerController : MonoBehaviour
         float targetSpeed = isRunning ? runSpeed : walkSpeed;
         Vector3 targetMove = (transform.right * x + transform.forward * z).normalized * targetSpeed;
 
-        currentMoveVelocity = Vector3.Lerp(currentMoveVelocity, targetMove, Time.deltaTime * acceleration);
+        float rate = targetMove.sqrMagnitude < currentMoveVelocity.sqrMagnitude ? deceleration : acceleration;
+        currentMoveVelocity = Vector3.MoveTowards(currentMoveVelocity, targetMove, rate * Time.deltaTime);
         controller.Move(currentMoveVelocity * Time.deltaTime);
 
         // --- ЗВУКИ ШАГОВ ---

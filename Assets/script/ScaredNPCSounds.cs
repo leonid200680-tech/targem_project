@@ -3,19 +3,24 @@ using UnityEngine;
 // Звуки перепуганного наркомана, по которым игрок находит его на 2 этаже:
 // сбивчивое дрожащее дыхание и всхлипы (генерируются в коде) и бормотание его же
 // фразами из озвучки ("тише, тише...") с дрожащим голосом.
-// Слышно только внутри здания и только пока игрок его ищет.
+// Слышно только внутри здания; после первой встречи - чуть тише, до финала.
 public class ScaredNPCSounds : MonoBehaviour
 {
     public NPCDialogueController npc;
 
     [Tooltip("С какого шага квеста начинает звучать")]
     public QuestManager.Step startStep = QuestManager.Step.ThirdFloor;
+    [Tooltip("Громкость после первой встречи (доля от громкости, пока его ищут)")]
+    [Range(0, 1)] public float afterMeetLevel = 0.65f;
 
     [Header("Где слышно")]
     [Tooltip("Звук слышен, только когда слушатель внутри этой зоны (здание)")]
     public Bounds audibleZone = new Bounds(new Vector3(-3.5f, 9.75f, -5.5f), new Vector3(62f, 12.5f, 22.4f));
     public float hearDistance = 22f;
     public float fadeSpeed = 1.5f;
+    [Tooltip("Громкость, когда слушатель на другом этаже")]
+    [Range(0, 1)] public float throughFloorVolume = 0.2f;
+    public float throughFloorCutoff = 450f;
 
     [Header("Бормотание (его реплики из озвучки)")]
     public AudioClip[] mutterClips;
@@ -29,6 +34,7 @@ public class ScaredNPCSounds : MonoBehaviour
 
     private AudioSource breath;
     private AudioSource voice;
+    private AudioLowPassFilter lowPass;
     private float level;      // идёт ли поиск (квест)
     private float inside;     // слушатель в здании
     private float nextMutter;
@@ -38,6 +44,7 @@ public class ScaredNPCSounds : MonoBehaviour
         if (npc == null) npc = GetComponentInParent<NPCDialogueController>();
         breath = MakeSource(MakeBreathClip(20f), true);
         voice = MakeSource(null, false);
+        lowPass = gameObject.AddComponent<AudioLowPassFilter>();
     }
 
     AudioSource MakeSource(AudioClip clip, bool loop)
@@ -58,16 +65,27 @@ public class ScaredNPCSounds : MonoBehaviour
     void Update()
     {
         var qm = QuestManager.Instance;
+        // Звучит и после первой встречи: к нему ещё возвращаться с книгой и за куклой.
+        // Пока его ищут - громко, потом чуть тише; замолкает только к финалу
         bool searching = npc == null || npc.currentState == NPCDialogueController.NPCState.FirstMeet;
-        bool want = qm != null && qm.CurrentStep >= startStep && searching && !DialogueManager.IsDialogueActive;
-        level = Mathf.MoveTowards(level, want ? 1f : 0f, Time.deltaTime * fadeSpeed * 0.4f);
+        bool present = npc == null || npc.currentState != NPCDialogueController.NPCState.ThirdFloorAmbush;
+        bool want = qm != null && qm.CurrentStep >= startStep && qm.CurrentStep < QuestManager.Step.Done
+            && present && !DialogueManager.IsDialogueActive;
+        float target = want ? (searching ? 1f : afterMeetLevel) : 0f;
+        level = Mathf.MoveTowards(level, target, Time.deltaTime * fadeSpeed * 0.4f);
 
         // На улице не слышно: глушим, когда слушатель (камера игрока) вне здания
         var cam = Camera.main;
         bool listenerInside = cam != null && audibleZone.Contains(cam.transform.position);
         inside = Mathf.MoveTowards(inside, listenerInside ? 1f : 0f, Time.deltaTime * fadeSpeed);
 
-        float gain = level * inside;
+        // Сквозь перекрытие: с другого этажа его слышно тихо и глухо, чтобы было понятно,
+        // что он не рядом, а выше или ниже
+        float dy = cam != null ? Mathf.Abs(cam.transform.position.y - 1.6f - transform.position.y) : 0f;   // 1.6 - рост до глаз
+        float otherFloor = Mathf.InverseLerp(1.8f, 3.2f, dy);
+        lowPass.cutoffFrequency = Mathf.Exp(Mathf.Lerp(Mathf.Log(22000f), Mathf.Log(throughFloorCutoff), otherFloor));
+
+        float gain = level * inside * Mathf.Lerp(1f, throughFloorVolume, otherFloor);
         breath.volume = gain * breathVolume;
         if (level > 0f && !breath.isPlaying) breath.Play();
         else if (level <= 0f && breath.isPlaying) breath.Stop();

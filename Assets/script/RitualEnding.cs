@@ -222,11 +222,54 @@ public class RitualEnding : MonoBehaviour
         }
         rumble.Stop();
 
+        // Игрок терял рассудок - вернулась не только Анджела: на мгновение вместо неё стоит бабка
+        if (Sanity.Lost > 0 && angela != null) yield return NotAlone();
+
         // ---------- Конец ----------
         if (QuestManager.Instance != null) QuestManager.Instance.OnRitualComplete();
         if (completeScreen == null) completeScreen = FindAnyObjectByType<GameCompleteScreen>(FindObjectsInactive.Include);
-        if (completeScreen != null) completeScreen.Show();
+        if (completeScreen != null)
+        {
+            Sanity.ApplyEnding(completeScreen, false);
+            completeScreen.Show();
+        }
         IsPlaying = false;
+    }
+
+    // Свет мигает, и в темноте на месте Анджелы дважды мелькает бабка с глухим ударом
+    IEnumerator NotAlone()
+    {
+        GameObject granny = null;
+        var hm = FindAnyObjectByType<HallucinationManager>(FindObjectsInactive.Include);
+        if (hm != null && hm.realGhost != null)
+        {
+            hm.realGhost.SetActive(false);
+            granny = Instantiate(hm.realGhost);
+            foreach (var b in granny.GetComponentsInChildren<MonoBehaviour>(true)) Destroy(b);
+            foreach (var a in granny.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true)) Destroy(a);
+            granny.transform.SetPositionAndRotation(angela.transform.position, angela.transform.rotation);
+        }
+        AudioClip boom = MakeBoom();
+        yield return new WaitForSeconds(0.8f);
+        for (int i = 0; i < 2; i++)
+        {
+            angelaLight.enabled = false;
+            yield return new WaitForSeconds(0.12f);
+            angela.SetActive(false);
+            if (granny != null) granny.SetActive(true);
+            angelaLight.enabled = true;
+            AudioSource.PlayClipAtPoint(boom, center.position, 0.7f);
+            shake = 0.05f;
+            yield return new WaitForSeconds(i == 0 ? 0.15f : 0.35f);
+            angelaLight.enabled = false;
+            if (granny != null) granny.SetActive(false);
+            angela.SetActive(true);
+            yield return new WaitForSeconds(0.1f);
+            angelaLight.enabled = true;
+            shake = 0.003f;
+            yield return new WaitForSeconds(0.9f);
+        }
+        if (granny != null) Destroy(granny);
     }
 
     IEnumerator BlowOutCandles()

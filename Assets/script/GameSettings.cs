@@ -31,6 +31,9 @@ public static class GameSettings
 
     // ---------- Яркость: компенсация экспозиции HDRP, -2..+2 EV ----------
     public static float Brightness { get; private set; }
+    // Базовая прибавка к экспозиции: игра без неё слишком тёмная. Ползунок яркости двигает от неё
+    const float BaseExposure = 1f;
+    public const int BrightnessLayer = 31;
     static Volume brightnessVolume;
     static Exposure brightnessExposure;
 
@@ -39,7 +42,9 @@ public static class GameSettings
         Brightness = Mathf.Clamp(ev, -2f, 2f);
         PlayerPrefs.SetFloat(BrightnessKey, Brightness);
         EnsureBrightnessVolume();
-        brightnessExposure.compensation.value = Brightness;
+        brightnessVolume.gameObject.layer = BrightnessLayer;   // и для объекта, созданного старой версией
+        float total = Brightness + BaseExposure;
+        brightnessExposure.compensation.value = total;
 
         // В темноте автоэкспозиция упирается в пределы профиля сцены, и одна компенсация
         // не может сделать картинку светлее. Поэтому сдвигаем и пределы на ту же величину.
@@ -47,8 +52,8 @@ public static class GameSettings
         {
             brightnessExposure.limitMin.overrideState = true;
             brightnessExposure.limitMax.overrideState = true;
-            brightnessExposure.limitMin.value = min - Brightness;
-            brightnessExposure.limitMax.value = max - Brightness;
+            brightnessExposure.limitMin.value = min - total;
+            brightnessExposure.limitMax.value = max - total;
         }
     }
 
@@ -84,6 +89,9 @@ public static class GameSettings
     {
         if (brightnessVolume != null) return;
         var go = new GameObject("Brightness (GameSettings)");
+        // Свой слой: его видят камера игрока, меню и катсцены, но не камеры наблюдения -
+        // у них своя фиксированная экспозиция "ночного режима", и прибавка яркости их пересвечивает
+        go.layer = BrightnessLayer;
         Object.DontDestroyOnLoad(go);
         go.hideFlags = HideFlags.DontSave;
         brightnessVolume = go.AddComponent<Volume>();

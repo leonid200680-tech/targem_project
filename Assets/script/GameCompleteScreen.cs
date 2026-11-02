@@ -12,6 +12,8 @@ public class GameCompleteScreen : MonoBehaviour
     public string subtitle = "Анджела спасена";
     [TextArea(2, 4)] public string epilogue = "Ритуал завершён, бабка изгнана. Анджела снова рядом с братом...\nпо крайней мере, так кажется.";
     public string footer = "Спасибо за игру  ·  On the Knee STUDIO";
+    [Tooltip("Какая концовка (\"Концовка 1 из 3 · ...\"), задаётся системой рассудка")]
+    public string endingLabel = "";
 
     [Header("Оформление")]
     public TMP_FontAsset titleFont;
@@ -93,6 +95,12 @@ public class GameCompleteScreen : MonoBehaviour
         group = content.GetComponent<CanvasGroup>();
         group.interactable = group.blocksRaycasts = false;
         var root = content.transform;
+
+        if (!string.IsNullOrEmpty(endingLabel))
+        {
+            var label = NewText("Ending", root, textFont, textMaterial, 30, endingLabel, new Color(0.62f, 0.56f, 0.5f, 0.85f), new Vector2(0, 390), new Vector2(1200, 50));
+            label.characterSpacing = 8;
+        }
 
         var t = NewText("Title", root, titleFont, titleMaterial, 120, title, new Color(0.48f, 0.025f, 0.02f), new Vector2(0, 250), new Vector2(1600, 180));
         t.characterSpacing = 14;

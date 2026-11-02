@@ -6,7 +6,7 @@ public class GhostKiller : MonoBehaviour
 {
     [Header("Настройки")]
     public float killDistance = 2.0f;
-    public GameObject deathScreen;
+    public GameObject deathScreen;   // используется, только если в сцене нет системы рассудка
     public AudioClip eatSound;
 
     private bool isDead = false;
@@ -14,6 +14,8 @@ public class GhostKiller : MonoBehaviour
     private Animator anim;
     private PlayerController pc;
     private Camera playerCam;
+    private Vector3 camRestPos;
+    private Quaternion camRestRot;
 
     void Start()
     {
@@ -29,14 +31,13 @@ public class GhostKiller : MonoBehaviour
 
     void Update()
     {
-        if (player == null || isDead) return;
+        if (player == null || isDead || HideableCloset.IsPlayerHidden) return; // в шкафу не достанет
 
         float dist = Vector3.Distance(transform.position, player.position);
 
-        // Если бабка подошла близко — сразу убиваем (без проверок canKill)
+        // Если бабка подошла близко — хватает игрока
         if (dist <= killDistance)
         {
-            Debug.Log("Бабка близко! Начинаем поедание игрока.");
             StartCoroutine(EatSequence());
         }
     }
@@ -67,10 +68,10 @@ public class GhostKiller : MonoBehaviour
         if (playerCam != null)
         {
             float fallDuration = 1.0f;
-            Vector3 startCamPos = playerCam.transform.localPosition;
-            Vector3 endCamPos = new Vector3(startCamPos.x, 0.2f, startCamPos.z); // Опускаем вниз к полу
-            Quaternion startCamRot = playerCam.transform.localRotation;
-            Quaternion endCamRot = Quaternion.Euler(-60f, startCamRot.eulerAngles.y, startCamRot.eulerAngles.z); // Наклоняем
+            camRestPos = playerCam.transform.localPosition;
+            camRestRot = playerCam.transform.localRotation;
+            Vector3 endCamPos = new Vector3(camRestPos.x, 0.2f, camRestPos.z); // Опускаем вниз к полу
+            Quaternion endCamRot = Quaternion.Euler(-60f, camRestRot.eulerAngles.y, camRestRot.eulerAngles.z); // Наклоняем
 
             float elapsed = 0;
             while (elapsed < fallDuration)
@@ -78,19 +79,58 @@ public class GhostKiller : MonoBehaviour
                 elapsed += Time.deltaTime;
                 float t = elapsed / fallDuration;
 
-                playerCam.transform.localPosition = Vector3.Lerp(startCamPos, endCamPos, t);
-                playerCam.transform.localRotation = Quaternion.Slerp(startCamRot, endCamRot, t);
+                playerCam.transform.localPosition = Vector3.Lerp(camRestPos, endCamPos, t);
+                playerCam.transform.localRotation = Quaternion.Slerp(camRestRot, endCamRot, t);
                 yield return null;
             }
         }
 
         // 6. Ждем, пока бабка ест
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(2f);
 
-        // 7. Включаем экран смерти
+        // 7. Игрок не умирает, а теряет рассудок и приходит в себя (см. Sanity)
+        if (Sanity.Instance != null)
+        {
+            Sanity.Instance.OnCaught(this);
+            yield break;
+        }
+
+        // Запасной вариант без системы рассудка: экран смерти
+        yield return new WaitForSeconds(1f);
         if (deathScreen != null) deathScreen.SetActive(true);
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+    }
+
+    // Игрок пришёл в себя: возвращаем камеру и управление, бабка снова ходит,
+    // но несколько секунд не может схватить
+    public void Revive(float grace)
+    {
+        if (playerCam != null)
+        {
+            playerCam.transform.localPosition = camRestPos;
+            playerCam.transform.localRotation = camRestRot;
+        }
+        if (pc != null) pc.enabled = true;
+
+        if (anim != null)
+        {
+            anim.ResetTrigger("EatPlayer");
+            anim.Rebind();
+            anim.Update(0f);
+        }
+        GhostChase chase = GetComponent<GhostChase>();
+        if (chase != null) chase.enabled = true;
+        UnityEngine.AI.NavMeshAgent agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+        if (agent != null) agent.isStopped = false;
+
+        StartCoroutine(GraceRoutine(grace));
+    }
+
+    IEnumerator GraceRoutine(float grace)
+    {
+        yield return new WaitForSeconds(grace);
+        isDead = false;
     }
 }

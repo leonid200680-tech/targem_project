@@ -43,7 +43,7 @@ public class FlickeringLight : MonoBehaviour
         while (true)
         {
             // 1. Случайная пауза (лампа горит стабильно)
-            yield return new WaitForSeconds(Random.Range(1f, 4f));
+            yield return new WaitForSeconds(Random.Range(1f, 4f) * Mathf.Lerp(1f, 0.35f, FearMeter.Level)); // страх - чаще
 
             // 2. Начинается мерцание (от 3 до 6 вспышек подряд)
             int flickerCount = Random.Range(3, 6);

@@ -9,7 +9,9 @@ public enum ItemType
     Lighter,
     Candle,
     LoreNote,
-    Doll
+    Doll,
+    Bottle,
+    Lens
 }
 
 [CreateAssetMenu(fileName = "NewItem", menuName = "Inventory/Item")]
