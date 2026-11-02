@@ -149,6 +149,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioManager
   mainMixer: {fileID: 24100000, guid: dd437b1384cfa6749aa82db00b06eb45, type: 2}
+  musicKeywords:
+  - Music
+  - "\u041C\u0443\u0437\u044B\u043A"
+  routeInterval: 0.1
 --- !u!4 &403369509
 Transform:
   m_ObjectHideFlags: 0
