@@ -27205,6 +27205,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &178905798
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -60850,6 +60854,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &674365965
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -78208,6 +78216,7 @@ GameObject:
   - component: {fileID: 958187594}
   - component: {fileID: 958187595}
   - component: {fileID: 958187596}
+  - component: {fileID: 958187597}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -78555,6 +78564,20 @@ MonoBehaviour:
   inventoryUI: {fileID: 947947734}
   lighterFlame: {fileID: 638740906}
   lighterAudioSource: {fileID: 324982997}
+--- !u!114 &958187597
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 958187584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a78052ba8f174f142bfee30c3891906b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FlashlightClick
+  spotLight: {fileID: 237154986}
+  volume: 0.55
 --- !u!1 &958348491 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5356644508325442535, guid: f5c9154271de6a4489445dc5a3e7ac63, type: 3}
@@ -79725,6 +79748,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &976970203
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -103035,6 +103062,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &1292000655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -124860,6 +124891,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &1590249679
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -143622,6 +143657,10 @@ PrefabInstance:
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
+    - target: {fileID: 2215581266525596419, guid: 5a6d3099d5ae1de4c877ce38b6fbae18, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: ef322e04a65efc04d8c0c6953e59057d, type: 2}
     - target: {fileID: 5866666021909216657, guid: 5a6d3099d5ae1de4c877ce38b6fbae18, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -157334,6 +157373,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &2056059163
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -160450,6 +160493,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ButtonSound
   hoverClip: {fileID: 8300000, guid: a7d3b6b6827bade469d8a853fcdc7f3f, type: 3}
+  clickClip: {fileID: 0}
+  hoverVolume: 0.22
+  clickVolume: 0.35
+  useSoftSounds: 1
 --- !u!114 &2114456956
 MonoBehaviour:
   m_ObjectHideFlags: 0

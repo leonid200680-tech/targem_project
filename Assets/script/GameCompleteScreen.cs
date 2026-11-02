@@ -130,6 +130,7 @@ public class GameCompleteScreen : MonoBehaviour
         var btn = plate.gameObject.AddComponent<Button>();
         btn.transition = Selectable.Transition.None;
         btn.onClick.AddListener(onClick);
+        plate.gameObject.AddComponent<ButtonSound>();
 
         var txt = NewText("Label", plate.transform, textFont, textMaterial, 46, label, Color.white, Vector2.zero, new Vector2(460, 74));
         txt.characterSpacing = 6;
