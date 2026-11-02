@@ -10,7 +10,8 @@ public class TrailerDirector : MonoBehaviour
 {
     public TMP_FontAsset titleFont, textFont;
     public Material titleMaterial, textMaterial;
-    public AudioClip heartbeat, scream, growl, momLine, addictLine, buzz;
+    public AudioClip heartbeat, scream, growl, momLine, addictLine, buzz, vibration;
+    public UnityEngine.Audio.AudioMixer mixer;
 
     public bool Finished { get; private set; }
 
@@ -18,7 +19,7 @@ public class TrailerDirector : MonoBehaviour
     private Image fade, flash;
     private RectTransform barTop, barBottom;
     private TextMeshProUGUI card, small, rec;
-    private AudioSource music, heart, voice, sfx;
+    private AudioSource music, heart, voice, sfx, amb, amb2, bed, pulse;
     private GameObject cctvOverlay;
     private Transform camTarget;
 
@@ -52,8 +53,14 @@ public class TrailerDirector : MonoBehaviour
         var hdCam = cg.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
         hdCam.volumeLayerMask = 1 | (1 << 31);
 
+        // Игровая музыка трейлеру не нужна: глушим все зацикленные 2D-источники игры
+        foreach (var s in FindObjectsByType<AudioSource>(FindObjectsSortMode.None))
+            if (s.loop && s.spatialBlend < 0.5f) s.Stop();
+
         AudioListener.volume = 1f;
         music = NewSource(0.9f); heart = NewSource(0.8f); voice = NewSource(1f); sfx = NewSource(1f);
+        amb = NewSource(0f); amb2 = NewSource(0f); bed = NewSource(0f); pulse = NewSource(0f);
+        foreach (var s in new[] { amb, amb2, bed, pulse }) s.loop = true;
         music.clip = MakeDrone(); music.loop = true; music.volume = 0f; music.Play();
         heart.clip = heartbeat; heart.loop = true;
 
@@ -64,6 +71,8 @@ public class TrailerDirector : MonoBehaviour
     {
         var s = gameObject.AddComponent<AudioSource>();
         s.playOnAwake = false; s.spatialBlend = 0f; s.volume = vol; s.ignoreListenerPause = true;
+        // Мимо игровых групп "Музыка/Звуки" (там громкость из настроек игрока) - прямо в Master
+        if (mixer != null) { var g = mixer.FindMatchingGroups("Master"); if (g.Length > 0) s.outputAudioMixerGroup = g[0]; }
         return s;
     }
 
@@ -74,31 +83,58 @@ public class TrailerDirector : MonoBehaviour
         Setup();
         yield return null;
         yield return Fade(1f, 1f, 0.01f);
+        // Звуки мира (лампы, генератор) тоже на полную - только на время записи, настройки игрока не трогаем
+        for (int f = 0; f < 6; f++) yield return null;
+        // +2 дБ сверху: трейлеры звучат плотнее игры (замер в среднем давал около -21 дБ RMS; +4 уже перегружал монтаж)
+        if (mixer != null) { mixer.SetFloat("MusicVol", 0f); mixer.SetFloat("SFXVol", 0f); mixer.SetFloat("MasterVol", 2f); }
 
-        // 0. Студия
-        StartCoroutine(Volume(music, 0.55f, 4f));
+        // Заготовки партитуры
+        var braam = TrailerScore.Braam(5f, -36);
+        var braamBig = TrailerScore.Braam(7f, -38);
+        var whoosh = TrailerScore.Whoosh(0.7f, 3);
+        var whoosh2 = TrailerScore.Whoosh(0.5f, 9);
+        var impact = TrailerScore.Impact(3f, 90f, 30f);
+
+        // 0. Студия: одна нота пианино из тишины
+        StartCoroutine(Volume(music, 0.45f, 4f));
+        sfx.PlayOneShot(TrailerScore.Piano(-24, 5f), 0.8f);
         yield return Card("On the Knee STUDIO\n<size=60%>представляет</size>", 3.2f, true);
 
-        // 1. Ночь, вагончик охраны вдали
+        // 1. Ночь, вагончик охраны вдали: ветер, тема пианино, голос мамы
         var t = Terrain.activeTerrain;
         Vector3 G(float x, float z, float h) => new Vector3(x, t.SampleHeight(new Vector3(x, 0, z)) + t.transform.position.y + h, z);
         voice.clip = momLine;
+        Loop(amb, TrailerScore.Wind(), 0.55f, 1.5f);
+        StartCoroutine(PianoTheme());
         yield return Shot(G(-40f, -48f, 1.6f), G(-33f, -42f, 1.5f), new Vector3(-24.3f, 2.0f, -36.1f), 6.5f, 1.2f, () => voice.PlayDelayed(1.4f));
 
-        // 2. Внутри вагончика: телефон, телевизор
+        // 2. Внутри вагончика: гул помещения, вибрирует телефон
+        Loop(amb, TrailerScore.RoomTone(), 0.35f, 0.4f);
+        if (vibration != null) sfx.PlayOneShot(vibration, 0.6f);
         yield return Shot(new Vector3(-26.6f, 1.75f, -34.6f), new Vector3(-24.6f, 1.55f, -35.4f), new Vector3(-21.8f, 1.1f, -37.6f), 5f, 0.6f);
+        sfx.PlayOneShot(braam, 0.55f);
         yield return Card("Обычная ночная смена.", 2.6f);
 
-        // 3. Здание, мигающая лампа над входом
+        // 3. Здание, мигающая лампа над входом: ветер и гудение лампы
+        Loop(amb, TrailerScore.Wind(), 0.5f, 0.4f);
+        Loop(amb2, buzz, 0.35f, 0.4f);
+        Loop(bed, TrailerScore.Pad(new[] { -24, -21, -17 }, 14f), 0.45f, 2f);
         yield return Shot(G(-3.5f, 26f, 1.7f), G(-3.5f, 15f, 1.6f), new Vector3(-3.5f, 5.6f, 5.3f), 6f, 0.6f);
 
-        // 4. Камера наблюдения: дверь открывается сама
+        // 4. Камера наблюдения: шипение, скрип открывающейся двери
+        StartCoroutine(Volume(amb, 0.15f, 0.3f)); StartCoroutine(Volume(amb2, 0f, 0.3f));
+        StartCoroutine(PlayAfter(TrailerScore.Creak(1.8f), 2.0f, 0.9f));
         yield return Cctv("CAM 01   1 ЭТАЖ — ВХОД", 5.5f);
+        sfx.PlayOneShot(braam, 0.7f);
+        sfx.PlayOneShot(whoosh, 0.5f);
         yield return Card("Но ты здесь не один.", 2.6f);
 
-        // 5. Коридор первого этажа, сердце начинает биться
+        // 5. Коридор первого этажа: гул здания, сердце, начинается пульс
+        Loop(amb, TrailerScore.RoomTone(), 0.4f, 0.3f);
+        Loop(pulse, TrailerScore.Pulse(72f, -33), 0.5f, 1.5f);
         heart.volume = 0.5f; heart.pitch = 1f; heart.Play();
         yield return Shot(new Vector3(-0.5f, 5.3f, -5.3f), new Vector3(-9.5f, 5.3f, -5.3f), new Vector3(-20f, 5.1f, -5.3f), 5f, 0.4f);
+        Loop(amb2, TrailerScore.Breath(), 0.5f, 0.3f);
 
         // 6. Наркоман в углу, кукла рядом
         voice.clip = addictLine;
@@ -111,19 +147,27 @@ public class TrailerDirector : MonoBehaviour
         fill.type = LightType.Point; fill.range = 5f; fill.intensity = 450f; fill.color = new Color(0.62f, 0.72f, 1f); fill.shadows = LightShadows.Soft;
         yield return Shot(nPos + new Vector3(-2.6f, 1.5f, -1.8f), nPos + new Vector3(-1.5f, 1.25f, -1.0f), nPos + new Vector3(0f, 0.75f, 0.4f), 5f, 0.3f, () => voice.PlayDelayed(0.6f));
         Destroy(fillGo);
+        StartCoroutine(Volume(amb2, 0f, 0.4f));
+        sfx.PlayOneShot(braam, 0.8f);
+        sfx.PlayOneShot(whoosh, 0.5f);
         yield return Card("Они что-то призвали.", 2.6f);
 
-        // 7. Пентаграмма и свечи
+        // 7. Пентаграмма и свечи: хоровой пад темнеет, пульс ускоряется
         foreach (var c in FindObjectsByType<CandleInteract>(FindObjectsSortMode.None)) if (c.fireEffect != null) c.fireEffect.SetActive(true);
         var pent = FindAnyObjectByType<Pentagram>();
         Vector3 pc = pent != null ? pent.transform.position : new Vector3(3.7f, 12f, -13.4f);
         heart.pitch = 1.25f; heart.volume = 0.7f;
+        Loop(bed, TrailerScore.Pad(new[] { -25, -22, -18, -13 }, 12f), 0.6f, 0.5f);
+        pulse.pitch = 1.3f; pulse.volume = 0.6f;
         yield return Shot(pc + new Vector3(-0.2f, 3.0f, 2.6f), pc + new Vector3(0.2f, 2.2f, 1.6f), pc, 4.5f, 0.3f);
 
-        // 8. Быстрый монтаж: бабка, плакат, кукла, бабка ближе
+        // 8. Быстрый монтаж: бабка, плакат, кукла, бабка ближе - под нарастание до скримера
         var granny = PrepareGranny();
         heart.pitch = 1.55f; heart.volume = 0.9f;
-        StartCoroutine(Volume(music, 0.9f, 2f));
+        pulse.pitch = 1.7f; pulse.volume = 0.6f;
+        StartCoroutine(Volume(music, 0.6f, 2f));
+        sfx.PlayOneShot(TrailerScore.Riser(5.3f), 0.5f);
+        StartCoroutine(Volume(bed, 0.35f, 1f));
         Vector3 corridorCam = new Vector3(-13.5f, 9.2f, -5.2f);
         yield return GrannyShot(granny, corridorCam, new Vector3(-24.5f, 7.84f, -5.2f), new Vector3(-23.3f, 7.84f, -5.2f), 1.6f);
         Hit();
@@ -139,16 +183,51 @@ public class TrailerDirector : MonoBehaviour
         yield return Flash(0.12f);
         yield return GrannyShot(granny, corridorCam, new Vector3(-16.6f, 7.84f, -5.2f), new Vector3(-15.9f, 7.84f, -5.2f), 0.7f);
 
-        // 9. Скример
+        // 9. Скример: удар и суб-падение, всё остальное обрывается
+        foreach (var s in new[] { music, heart, amb, amb2, bed, pulse }) s.Stop();
+        sfx.PlayOneShot(impact, 0.7f); // крик и удар вместе упирались в 0 дБ - чуть тише, без хрипа
         yield return Screamer(granny, corridorCam);
 
-        // 10. Тишина и название
-        music.Stop(); heart.Stop();
+        // 10. Тишина и название: огромный брам, одна нота пианино в хвосте
+        sfx.Stop();
         fade.color = Color.black;
         yield return new WaitForSeconds(1.4f);
-        sfx.PlayOneShot(MakeBoom(), 1f);
+        sfx.PlayOneShot(braamBig, 1f);
+        sfx.PlayOneShot(MakeBoom(), 0.6f);
+        StartCoroutine(PlayAfter(TrailerScore.Piano(-27, 5f), 3.2f, 0.7f));
         yield return Title(6.5f);
         Finished = true;
+    }
+
+    // Медленная тема пианино (ля минор): по ноте раз в полторы-две секунды, пока идёт начало
+    IEnumerator PianoTheme()
+    {
+        int[] notes = { -12, -9, -5, -7, -12, -14, -9, -10 };
+        foreach (int n in notes)
+        {
+            sfx.PlayOneShot(TrailerScore.Piano(n, 4f), 0.42f);
+            yield return new WaitForSeconds(n == -10 ? 2.4f : 1.7f);
+        }
+    }
+
+    IEnumerator PlayAfter(AudioClip clip, float delay, float volume)
+    {
+        yield return new WaitForSeconds(delay);
+        sfx.PlayOneShot(clip, volume);
+    }
+
+    // Плавно сменить зацикленный звук на источнике
+    void Loop(AudioSource s, AudioClip clip, float volume, float fadeTime)
+    {
+        if (clip == null) return;
+        StartCoroutine(SwapLoop(s, clip, volume, fadeTime));
+    }
+
+    IEnumerator SwapLoop(AudioSource s, AudioClip clip, float volume, float fadeTime)
+    {
+        if (s.isPlaying && s.clip != clip) yield return Volume(s, 0f, fadeTime * 0.5f);
+        if (s.clip != clip || !s.isPlaying) { s.clip = clip; s.Play(); }
+        yield return Volume(s, volume, fadeTime * 0.5f + 0.01f);
     }
 
     // ---------- Кадры ----------
@@ -244,8 +323,8 @@ public class TrailerDirector : MonoBehaviour
         Vector3 start = g.transform.position;
         Vector3 end = camPos + (start - camPos).normalized * 0.9f; end.y = start.y;
         if (an != null) an.SetTrigger("Cream");
-        sfx.PlayOneShot(scream, 1f);
-        if (growl != null) sfx.PlayOneShot(growl, 0.6f);
+        sfx.PlayOneShot(scream, 0.6f);
+        if (growl != null) sfx.PlayOneShot(growl, 0.4f);
         float t = 0f;
         while (t < 0.55f)
         {
@@ -299,6 +378,7 @@ public class TrailerDirector : MonoBehaviour
     void Hit()
     {
         sfx.PlayOneShot(MakeHit(), 0.9f);
+        sfx.PlayOneShot(TrailerScore.Whoosh(0.45f, Random.Range(1, 99)), 0.45f);
     }
 
     IEnumerator Flash(float time)

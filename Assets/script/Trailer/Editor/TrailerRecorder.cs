@@ -20,6 +20,13 @@ public static class TrailerRecorder
         EditorApplication.isPlaying = true;
     }
 
+    [MenuItem("Tools/Trailer/Preview (measure audio)")]
+    public static void MeterRun()
+    {
+        EditorPrefs.SetBool(PendingKey + ".Meter", true);
+        EditorApplication.isPlaying = true;
+    }
+
     [InitializeOnLoadMethod]
     static void Init()
     {
@@ -30,10 +37,26 @@ public static class TrailerRecorder
                 EditorPrefs.SetBool(PendingKey, false);
                 EditorApplication.delayCall += StartTrailer;
             }
+            if (s == PlayModeStateChange.EnteredPlayMode && EditorPrefs.GetBool(PendingKey + ".Meter", false))
+            {
+                EditorPrefs.SetBool(PendingKey + ".Meter", false);
+                EditorApplication.delayCall += PreviewWithMeter;
+            }
         };
     }
 
     public static string OutputPath => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Trailer", "Kontora_Trailer"));
+
+    // Прогон без записи с замером громкости (для проверки звука): уровни пишутся в Trailer/levels.txt
+    public static bool measureOnly;
+    static System.Text.StringBuilder levels;
+    static float nextMeasure;
+
+    public static void PreviewWithMeter()
+    {
+        measureOnly = true;
+        StartTrailer();
+    }
 
     public static void StartTrailer()
     {
@@ -55,6 +78,9 @@ public static class TrailerRecorder
         director.growl = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/monster-growl-and-squelch.mp3");
         director.momLine = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Озвучка/Твоя сестра не отвечает.mp3");
         director.addictLine = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Озвучка 2/4 реплика (наркоша).mp3");
+        director.buzz = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/script/Мерцающая лампочка/Лампочка(buzz).mp3");
+        director.vibration = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Озвучка/PhoneVibration/Vibration.mp3");
+        director.mixer = AssetDatabase.LoadAssetAtPath<UnityEngine.Audio.AudioMixer>("Assets/MainMixer.mixer");
 
         var settings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
         settings.SetRecordModeToManual();
@@ -71,18 +97,48 @@ public static class TrailerRecorder
         movie.OutputFile = OutputPath;
         settings.AddRecorderSettings(movie);
 
-        controller = new RecorderController(settings);
-        controller.PrepareRecording();
-        controller.StartRecording();
+        if (measureOnly)
+        {
+            levels = new System.Text.StringBuilder();
+            nextMeasure = 0f;
+        }
+        else
+        {
+            controller = new RecorderController(settings);
+            controller.PrepareRecording();
+            controller.StartRecording();
+        }
         director.Begin();
         EditorApplication.update += Watch;
         Debug.Log("[Trailer] recording -> " + OutputPath + ".mp4");
     }
 
+    static readonly float[] meterBuf = new float[2048];
+    static float peakAcc, rmsAcc; static int rmsCount;
+
     static void Watch()
     {
+        if (measureOnly && levels != null && EditorApplication.isPlaying)
+        {
+            AudioListener.GetOutputData(meterBuf, 0);
+            double s = 0; float pk = 0;
+            foreach (float v in meterBuf) { s += v * v; pk = Mathf.Max(pk, Mathf.Abs(v)); }
+            rmsAcc += (float)System.Math.Sqrt(s / meterBuf.Length); rmsCount++; peakAcc = Mathf.Max(peakAcc, pk);
+            if (Time.time >= nextMeasure)
+            {
+                float rms = rmsCount > 0 ? rmsAcc / rmsCount : 0f;
+                levels.AppendLine($"{Time.time,5:F0}s  rms={rms:F3} ({20 * Mathf.Log10(Mathf.Max(rms, 1e-5f)),6:F1} dB)  peak={peakAcc:F2}");
+                rmsAcc = 0; rmsCount = 0; peakAcc = 0; nextMeasure = Time.time + 1f;
+            }
+        }
         if (director != null && !director.Finished && EditorApplication.isPlaying) return;
         EditorApplication.update -= Watch;
+        if (measureOnly && levels != null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(OutputPath), "levels.txt"), levels.ToString());
+            levels = null; measureOnly = false;
+        }
         if (controller != null && controller.IsRecording()) controller.StopRecording();
         controller = null;
         Debug.Log("[Trailer] done: " + OutputPath + ".mp4");
