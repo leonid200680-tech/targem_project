@@ -75,6 +75,11 @@ public class InteractableTV : MonoBehaviour
     private float apparitionUntil;
     private string message;
     private float messageUntil;
+    // Камера "врёт": в одной из камер стоит охранник (сам игрок) спиной к камере, хотя игрок сейчас у телевизора.
+    // Один раз: переключился на другую камеру и обратно - его там уже нет.
+    private GameObject doppel;
+    private int doppelCamera = -1;
+    private bool doppelDone;
 
     void Start()
     {
@@ -109,6 +114,9 @@ public class InteractableTV : MonoBehaviour
             feed.texture = feedTexture;
         }
 
+        // Двойник - в камере 2 этажа (CAM 03): там он стоит в проёме кабинета, в свете ИК-подсветки
+        if (doppelCamera < 0 && CameraCount > 1) doppelCamera = CameraCount > 2 ? 2 : (current + 1) % CameraCount;
+
         overlay.gameObject.SetActive(true);
         SetFillLights(false);
         if (powerSound != null) AudioSource.PlayClipAtPoint(powerSound, transform.position);
@@ -124,13 +132,15 @@ public class InteractableTV : MonoBehaviour
     {
         IsViewing = false;
         HideApparition();
+        if (doppel != null && doppel.activeSelf) { doppel.SetActive(false); doppelDone = true; }
         apparitionAfter = -1f;
         foreach (var c in cameras) if (c != null) c.SetLive(false, null);
-        overlay.gameObject.SetActive(false);
+        if (overlay != null) overlay.gameObject.SetActive(false);
         SetFillLights(true);
-        hiss.Stop();
+        if (hiss != null) hiss.Stop();
         if (player != null) player.enabled = true;
-        if (powerSound != null) AudioSource.PlayClipAtPoint(powerSound, transform.position);
+        // при выгрузке сцены (OnDisable) звук не создаём
+        if (powerSound != null && isActiveAndEnabled) AudioSource.PlayClipAtPoint(powerSound, transform.position);
     }
 
     void ShowCamera(int index)
@@ -148,6 +158,10 @@ public class InteractableTV : MonoBehaviour
         // Пугалка: в новой камере - с шансом, в камере, где уже кто-то мелькал, - обязательно (и ближе)
         HideApparition();
         apparitionAfter = -1f;
+
+        // Двойник: появляется в выбранной камере при первом показе, при уходе с неё исчезает навсегда
+        if (doppel != null && doppel.activeSelf) { doppel.SetActive(false); doppelDone = true; }
+        if (!doppelDone && current == doppelCamera && ShowDoppel(cam)) return;   // в этой камере больше ничего не нужно
         if (apparitionsShown < maxApparitions && (hauntCount[current] > 0 || UnityEngine.Random.value < apparitionChance))
             apparitionAfter = UnityEngine.Random.Range(1.5f, 3.5f);
     }
@@ -178,7 +192,7 @@ public class InteractableTV : MonoBehaviour
     }
 
     // Ставит фигуру перед камерой: на пол, в кадре и чтобы ничего не загораживало
-    bool PlaceApparition(CCTVCamera cam, float dist)
+    bool PlaceApparition(CCTVCamera cam, float dist, float minDist = 2.5f, float step = 1f)
     {
         if (cam == null) return false;
         if (apparition == null) apparition = MakeApparition();
@@ -190,7 +204,7 @@ public class InteractableTV : MonoBehaviour
         fwd.Normalize();
         Vector3 side = Vector3.Cross(Vector3.up, fwd);
 
-        for (float d = dist; d >= 2.5f; d -= 1f)
+        for (float d = dist; d >= minDist; d -= step)
         {
             Vector3 p = t.position + fwd * d + side * UnityEngine.Random.Range(-0.6f, 0.6f);
             if (!Physics.Raycast(p, Vector3.down, out RaycastHit hit, 8f, ~0, QueryTriggerInteraction.Ignore)) continue;
@@ -227,6 +241,46 @@ public class InteractableTV : MonoBehaviour
         foreach (var a in go.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true)) DestroyImmediate(a);
         foreach (var c in go.GetComponentsInChildren<Collider>(true)) DestroyImmediate(c);
         foreach (var s in go.GetComponentsInChildren<AudioSource>(true)) DestroyImmediate(s);
+        return go;
+    }
+
+    // Охранник стоит спиной к камере и смотрит вглубь коридора. Без звука и помех - просто стоит.
+    bool ShowDoppel(CCTVCamera cam)
+    {
+        if (doppel == null) doppel = MakeDoppel();
+        if (doppel == null || cam == null) return false;
+
+        // Место ищем так же, как для бабки (временно ставим туда копию бабки и берём её позицию)
+        var keep = apparition;
+        apparition = doppel;
+        bool placed = PlaceApparition(cam, 3.6f, 1.4f, 0.3f);
+        apparition = keep;
+        if (!placed) return false;
+
+        doppel.transform.rotation = Quaternion.LookRotation(-(doppel.transform.rotation * Vector3.forward));   // спиной к камере
+        doppel.SetActive(true);
+        return true;
+    }
+
+    // Копия модели игрока без поведения, целиком (с головой), в спокойной стойке
+    GameObject MakeDoppel()
+    {
+        var body = FindAnyObjectByType<PlayerBodyAnimator>(FindObjectsInactive.Include);
+        if (body == null) return null;
+        var holder = new GameObject("tmp");
+        holder.SetActive(false);
+        var go = Instantiate(body.gameObject, holder.transform);
+        go.name = "CCTV Doppelganger";
+        foreach (var b in go.GetComponentsInChildren<MonoBehaviour>(true)) DestroyImmediate(b);
+        foreach (var c in go.GetComponentsInChildren<Collider>(true)) DestroyImmediate(c);
+        var hands = go.transform.Find("FPS_HANDS");
+        if (hands != null) DestroyImmediate(hands.gameObject);
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+        go.transform.SetParent(null, false);
+        go.transform.localScale = body.transform.lossyScale;
+        go.SetActive(false);
+        Destroy(holder);
         return go;
     }
 

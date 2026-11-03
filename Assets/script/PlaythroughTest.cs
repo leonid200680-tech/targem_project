@@ -97,7 +97,7 @@ public class PlaythroughTest : MonoBehaviour
         {
             show.Invoke(tv, new object[] { i });
             noise.SetValue(tv, 0f);
-            yield return new WaitForSeconds(1.6f);
+            yield return new WaitForSeconds(2.5f);   // с запасом на случайные помехи
         }
         tv.Interact();
         yield return Expect(QuestManager.Step.TakeItems, 3f, "просмотрел все камеры (" + tv.CamerasSeen + "/" + tv.CameraCount + ")");

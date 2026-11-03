@@ -4,12 +4,13 @@ public class InteractableDoor : MonoBehaviour
 {
     public float openAngle = 90f;
     public float speed = 3f;
-    public string prompt = "Нажмите E, чтобы открыть";
+    public string prompt = "РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РѕС‚РєСЂС‹С‚СЊ";
 
     private bool isOpen = false;
     private bool isLocked = false;
     private Quaternion closedRotation;
     private Quaternion openRotation;
+    private float openFraction = 1f;   // 1 - РѕС‚РєСЂС‹С‚Р° РїРѕР»РЅРѕСЃС‚СЊСЋ, РјРµРЅСЊС€Рµ - РїСЂРёРѕС‚РєСЂС‹С‚Р° (С‰С‘Р»РєР°)
 
     void Start()
     {
@@ -20,22 +21,23 @@ public class InteractableDoor : MonoBehaviour
     void Update()
     {
         if (isOpen)
-            transform.localRotation = Quaternion.Slerp(transform.localRotation, openRotation, Time.deltaTime * speed);
+            transform.localRotation = Quaternion.Slerp(transform.localRotation, Quaternion.Slerp(closedRotation, openRotation, openFraction), Time.deltaTime * speed);
         else
             transform.localRotation = Quaternion.Slerp(transform.localRotation, closedRotation, Time.deltaTime * speed);
     }
 
     public void Interact()
     {
-        if (isLocked) return; // Если дверь заперта, игрок ничего не сделает
+        if (isLocked) return; // Р•СЃР»Рё РґРІРµСЂСЊ Р·Р°РїРµСЂС‚Р°, РёРіСЂРѕРє РЅРёС‡РµРіРѕ РЅРµ СЃРґРµР»Р°РµС‚
         isOpen = !isOpen;
+        openFraction = 1f;
     }
 
-    // Вот этот метод искал OfficeTrigger!
+    // Р’РѕС‚ СЌС‚РѕС‚ РјРµС‚РѕРґ РёСЃРєР°Р» OfficeTrigger!
     public void LockDoor()
     {
         isLocked = true;
-        isOpen = false; // Принудительно закрываем дверь
+        isOpen = false; // РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ Р·Р°РєСЂС‹РІР°РµРј РґРІРµСЂСЊ
     }
 
     public void UnlockDoor()
@@ -46,9 +48,17 @@ public class InteractableDoor : MonoBehaviour
     public bool IsLocked => isLocked;
     public bool IsOpen => isOpen;
 
-    // Для шкафов: открыть/закрыть без переключения
+    // Р”Р»СЏ С€РєР°С„РѕРІ: РѕС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ Р±РµР· РїРµСЂРµРєР»СЋС‡РµРЅРёСЏ
     public void SetOpen(bool open)
     {
-        if (!isLocked) isOpen = open;
+        if (!isLocked) { isOpen = open; openFraction = 1f; }
+    }
+
+    // РџСЂРёРѕС‚РєСЂС‹С‚СЊ РЅР° РґРѕР»СЋ РѕС‚ РїРѕР»РЅРѕРіРѕ СѓРіР»Р° (Р±Р°Р±РєР° Р·Р°РіР»СЏРґС‹РІР°РµС‚ РІ С€РєР°С„)
+    public void SetAjar(float fraction)
+    {
+        if (isLocked) return;
+        isOpen = true;
+        openFraction = Mathf.Clamp01(fraction);
     }
 }

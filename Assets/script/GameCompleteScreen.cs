@@ -35,6 +35,7 @@ public class GameCompleteScreen : MonoBehaviour
     {
         if (shown) return;
         shown = true;
+        OutdoorSound.EndingSilence = true;
         gameObject.SetActive(true);
         StartCoroutine(ShowRoutine());
     }

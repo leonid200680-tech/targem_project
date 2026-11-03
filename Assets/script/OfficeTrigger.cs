@@ -4,14 +4,14 @@ using UnityEngine.Video;
 
 public class OfficeTrigger : MonoBehaviour
 {
-    [Header("Видео на экране")]
+    [Header("Р’РёРґРµРѕ РЅР° СЌРєСЂР°РЅРµ")]
     public GameObject videoPanel;
     public VideoPlayer videoPlayer;
 
-    [Header("Дверь")]
+    [Header("Р”РІРµСЂСЊ")]
     public InteractableDoor doorToLock;
 
-    [Header("Телепортация после видео")]
+    [Header("РўРµР»РµРїРѕСЂС‚Р°С†РёСЏ РїРѕСЃР»Рµ РІРёРґРµРѕ")]
     public Transform spawnPoint;
 
     private bool hasTriggered = false;
@@ -35,39 +35,52 @@ public class OfficeTrigger : MonoBehaviour
         if (doorToLock != null) doorToLock.LockDoor();
         if (QuestManager.Instance != null) QuestManager.Instance.OnOfficeReached();
 
-        // Отключаем управление
+        // РћС‚РєР»СЋС‡Р°РµРј СѓРїСЂР°РІР»РµРЅРёРµ
         if (pc != null) pc.enabled = false;
 
-        // Показываем видео
+        // РџРѕРєР°Р·С‹РІР°РµРј РІРёРґРµРѕ
         if (videoPanel != null && videoPlayer != null)
         {
             videoPanel.SetActive(true);
             videoPlayer.Prepare();
             while (!videoPlayer.isPrepared) yield return null;
             videoPlayer.Play();
-            yield return new WaitForSeconds((float)videoPlayer.clip.length);
+            // Р–РґС‘Рј РєРѕРЅС†Р° РІРёРґРµРѕ РїРѕ РµРіРѕ СЃРѕР±СЃС‚РІРµРЅРЅРѕРјСѓ РІСЂРµРјРµРЅРё: РїР°СѓР·Р° РµРіРѕ РѕСЃС‚Р°РЅР°РІР»РёРІР°РµС‚, РїРѕСЃР»Рµ РїР°СѓР·С‹ РѕРЅРѕ РїСЂРѕРґРѕР»Р¶Р°РµС‚СЃСЏ
+            float length = (float)videoPlayer.clip.length;
+            float watched = 0f;
+            while (watched < length + 3f)
+            {
+                if (!PauseMenu.GameIsPaused)
+                {
+                    watched += Time.unscaledDeltaTime;
+                    if (watched > 0.5f && !videoPlayer.isPlaying) break;              // РґРѕРёРіСЂР°Р»Рѕ
+                    if (videoPlayer.time >= length - 0.05f) break;
+                }
+                yield return null;
+            }
+            videoPlayer.Stop();
             videoPanel.SetActive(false);
         }
 
-        // ТЕЛЕПОРТАЦИЯ
+        // РўР•Р›Р•РџРћР РўРђР¦РРЇ
         if (spawnPoint != null)
         {
             CharacterController cc = playerObj.GetComponent<CharacterController>();
 
-            // 1. Отключаем контроллер
+            // 1. РћС‚РєР»СЋС‡Р°РµРј РєРѕРЅС‚СЂРѕР»Р»РµСЂ
             if (cc != null) cc.enabled = false;
 
-            // 2. Перемещаем игрока
+            // 2. РџРµСЂРµРјРµС‰Р°РµРј РёРіСЂРѕРєР°
             playerObj.transform.position = spawnPoint.position;
             playerObj.transform.rotation = spawnPoint.rotation;
 
-            // 3. Включаем контроллер
+            // 3. Р’РєР»СЋС‡Р°РµРј РєРѕРЅС‚СЂРѕР»Р»РµСЂ
             if (cc != null) cc.enabled = true;
 
-            Debug.Log("Игрок телепортирован на точку: " + spawnPoint.name);
+            Debug.Log("РРіСЂРѕРє С‚РµР»РµРїРѕСЂС‚РёСЂРѕРІР°РЅ РЅР° С‚РѕС‡РєСѓ: " + spawnPoint.name);
         }
 
-        // Возвращаем управление
+        // Р’РѕР·РІСЂР°С‰Р°РµРј СѓРїСЂР°РІР»РµРЅРёРµ
         if (pc != null) pc.enabled = true;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;

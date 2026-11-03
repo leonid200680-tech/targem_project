@@ -46,6 +46,7 @@ public class QuestManager : MonoBehaviour
     private bool phoneAnswered;
     private bool ringStarted;
     private float playerReadyTime = -1f;
+    private readonly System.Collections.Generic.List<GameObject> hiddenStones = new System.Collections.Generic.List<GameObject>();
 
     void Awake()
     {
@@ -62,6 +63,18 @@ public class QuestManager : MonoBehaviour
         if (pentagram == null) pentagram = FindAnyObjectByType<Pentagram>();
         candles = FindObjectsByType<CandleInteract>(FindObjectsInactive.Include);
         if (questText != null) baseTextColor = questText.color;
+
+        // Камни для ритуала появляются только когда книга отдана сектанту
+        foreach (var p in FindObjectsByType<PickupItem>(FindObjectsInactive.Include))
+        {
+            if (p.item == null || p.item.type != ItemType.Stone) continue;
+            if (pentagram != null && p.transform.IsChildOf(pentagram.transform)) continue;
+            var root = p.transform;
+            while (root.parent != null) root = root.parent;
+            if (!root.gameObject.activeSelf) continue;
+            root.gameObject.SetActive(false);
+            hiddenStones.Add(root.gameObject);
+        }
 
         SetStep(Step.AnswerPhone, false);
     }
@@ -198,6 +211,11 @@ public class QuestManager : MonoBehaviour
     void SetStep(Step step, bool withEffect = true)
     {
         currentStep = step;
+        if (step >= Step.PlaceStones)
+        {
+            foreach (var s in hiddenStones) if (s != null) s.SetActive(true);
+            hiddenStones.Clear();
+        }
         if (questText != null) questText.text = StepText(step) + ProgressSuffix();
 
         // Проигрываем звук и анимацию

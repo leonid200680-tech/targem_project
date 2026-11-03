@@ -121,7 +121,7 @@ public class GrannySounds : MonoBehaviour
     static float Rand(System.Random r) => (float)r.NextDouble() * 2f - 1f;
 
     // Шарканье: волочение стопы по полу + мягкий удар пятки
-    static AudioClip MakeStep(int seed)
+    public static AudioClip MakeStep(int seed)
     {
         const int rate = 22050;
         var rnd = new System.Random(100 + seed);
@@ -145,7 +145,7 @@ public class GrannySounds : MonoBehaviour
     }
 
     // Медленное хриплое дыхание с бульканьем (луп)
-    static AudioClip MakeBreath()
+    public static AudioClip MakeBreath()
     {
         const int rate = 22050;
         int n = rate * 6;
@@ -169,7 +169,7 @@ public class GrannySounds : MonoBehaviour
     }
 
     // Низкий старушечий стон: голос с дрожью, высота сползает вниз
-    static AudioClip MakeMoan(int seed)
+    public static AudioClip MakeMoan(int seed)
     {
         const int rate = 22050;
         var rnd = new System.Random(200 + seed);

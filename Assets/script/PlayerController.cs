@@ -40,6 +40,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 velocity;
     private Vector3 currentMoveVelocity;
     private float xRotation = 0f;
+    // Наклон камеры вверх/вниз (шкаф выставляет его сам, пока игрок внутри)
+    public float Pitch { get => xRotation; set => xRotation = value; }
     private bool isRunning = false;
     private float bobTimer = 0f;
 

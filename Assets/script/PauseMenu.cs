@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Video;
+using System.Collections.Generic;
 
 public class PauseMenu : MonoBehaviour
 {
@@ -9,9 +11,12 @@ public class PauseMenu : MonoBehaviour
     public GameObject pauseMenuPanel;
     public GameObject gameplayHUD;
     public GameObject mainMenuPanel;
-    public GameObject settingsPanel; // <-- ДОБАВИЛИ ПАНЕЛЬ НАСТРОЕК
+    public GameObject settingsPanel; // <-- Р”РћР‘РђР’РР›Р РџРђРќР•Р›Р¬ РќРђРЎРўР РћР•Рљ
     public AudioListener menuAudioListener;
     public GameObject videoBackground;
+
+    // Р’РёРґРµРѕ-РєР°С‚СЃС†РµРЅС‹, РїРѕСЃС‚Р°РІР»РµРЅРЅС‹Рµ РЅР° РїР°СѓР·Сѓ (РїСЂРѕРґРѕР»Р¶Р°СЋС‚СЃСЏ РїРѕСЃР»Рµ СЃРЅСЏС‚РёСЏ РїР°СѓР·С‹)
+    private readonly List<VideoPlayer> pausedVideos = new List<VideoPlayer>();
 
     private void Start()
     {
@@ -22,7 +27,7 @@ public class PauseMenu : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // Если открыты настройки, Esc должен закрывать их
+            // Р•СЃР»Рё РѕС‚РєСЂС‹С‚С‹ РЅР°СЃС‚СЂРѕР№РєРё, Esc РґРѕР»Р¶РµРЅ Р·Р°РєСЂС‹РІР°С‚СЊ РёС…
             if (settingsPanel.activeSelf)
             {
                 ClosePauseSettings();
@@ -39,6 +44,10 @@ public class PauseMenu : MonoBehaviour
         pauseMenuPanel.SetActive(false);
         if (gameplayHUD != null) gameplayHUD.SetActive(true);
 
+        // РљР°С‚СЃС†РµРЅР° РїСЂРѕРґРѕР»Р¶Р°РµС‚СЃСЏ СЃ С‚РѕРіРѕ Р¶Рµ РјРµСЃС‚Р°
+        foreach (var v in pausedVideos) if (v != null && v.gameObject.activeInHierarchy) v.Play();
+        pausedVideos.Clear();
+
         Time.timeScale = 1f;
         GameIsPaused = false;
         AudioListener.pause = false;
@@ -49,7 +58,14 @@ public class PauseMenu : MonoBehaviour
     public void Pause()
     {
         pauseMenuPanel.SetActive(true);
-        if (gameplayHUD != null) gameplayHUD.SetActive(false);
+
+        // Р’РёРґРµРѕ-РєР°С‚СЃС†РµРЅС‹ Р¶РёРІСѓС‚ РІРЅСѓС‚СЂРё HUD: СЃС‚Р°РІРёРј РёС… РЅР° РїР°СѓР·Сѓ, Р° HUD РЅРµ РїСЂСЏС‡РµРј,
+        // РёРЅР°С‡Рµ РІРёРґРµРѕ РІС‹РєР»СЋС‡РёС‚СЃСЏ Рё РїРѕСЃР»Рµ РїР°СѓР·С‹ РѕСЃС‚Р°РЅРµС‚СЃСЏ Р·Р°СЃС‚С‹РІС€РёР№ РєР°РґСЂ
+        pausedVideos.Clear();
+        if (gameplayHUD != null)
+            foreach (var v in gameplayHUD.GetComponentsInChildren<VideoPlayer>())
+                if (v.isPlaying) { v.Pause(); pausedVideos.Add(v); }
+        if (gameplayHUD != null && pausedVideos.Count == 0) gameplayHUD.SetActive(false);
 
         Time.timeScale = 0f;
         GameIsPaused = true;
@@ -58,19 +74,19 @@ public class PauseMenu : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
     }
 
-    // --- НОВЫЕ МЕТОДЫ ДЛЯ НАСТРОЕК ИЗ ПАУЗЫ ---
+    // --- РќРћР’Р«Р• РњР•РўРћР”Р« Р”Р›РЇ РќРђРЎРўР РћР•Рљ РР— РџРђРЈР—Р« ---
 
     public void OpenPauseSettings()
     {
-        pauseMenuPanel.SetActive(false); // Прячем меню паузы
-        settingsPanel.SetActive(true);   // Показываем настройки
+        pauseMenuPanel.SetActive(false); // РџСЂСЏС‡РµРј РјРµРЅСЋ РїР°СѓР·С‹
+        settingsPanel.SetActive(true);   // РџРѕРєР°Р·С‹РІР°РµРј РЅР°СЃС‚СЂРѕР№РєРё
         PauseMenu.GameIsPaused = true;
     }
 
     public void ClosePauseSettings()
     {
-        settingsPanel.SetActive(false);  // Прячем настройки
-        pauseMenuPanel.SetActive(true);  // Возвращаем меню паузы
+        settingsPanel.SetActive(false);  // РџСЂСЏС‡РµРј РЅР°СЃС‚СЂРѕР№РєРё
+        pauseMenuPanel.SetActive(true);  // Р’РѕР·РІСЂР°С‰Р°РµРј РјРµРЅСЋ РїР°СѓР·С‹
     }
 
     // ------------------------------------------
@@ -81,7 +97,7 @@ public class PauseMenu : MonoBehaviour
         GameIsPaused = false;
         AudioListener.pause = false;
 
-        // Меню и игра в одной сцене: перезагружаем её, чтобы следующая игра началась с нуля
+        // РњРµРЅСЋ Рё РёРіСЂР° РІ РѕРґРЅРѕР№ СЃС†РµРЅРµ: РїРµСЂРµР·Р°РіСЂСѓР¶Р°РµРј РµС‘, С‡С‚РѕР±С‹ СЃР»РµРґСѓСЋС‰Р°СЏ РёРіСЂР° РЅР°С‡Р°Р»Р°СЃСЊ СЃ РЅСѓР»СЏ
         HideableCloset.IsPlayerHidden = false;
         PickupItem.stonesCollected = 0;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

@@ -32,6 +32,12 @@ public class Rat : MonoBehaviour
     private Transform player;
     private string animState = "Run";
 
+    // Один раз за игру одна крыса не убегает, а останавливается и молча смотрит на игрока.
+    // Исчезает, как только игрок отведёт взгляд.
+    public static bool StareUsed;
+    private bool staring;
+    private float stareStart, lookAway;
+
     public void Run(IList<Vector3> points, Transform playerTransform)
     {
         path.Clear();
@@ -83,6 +89,12 @@ public class Rat : MonoBehaviour
             return;
         }
 
+        if (staring || TryStartStare())
+        {
+            Stare();
+            return;
+        }
+
         bool scared = player != null && Vector3.Distance(player.position, transform.position) < fleeDistance;
         bool paused = Time.time < pauseUntil && !scared;
 
@@ -127,6 +139,49 @@ public class Rat : MonoBehaviour
             audioSource.PlayOneShot(squeaks[Random.Range(0, squeaks.Length)], Random.Range(0.6f, 1f) * (scared ? 1.3f : 1f));
             nextSqueak = Time.time + Random.Range(1.5f, 5f) * (scared ? 0.5f : 1f);
         }
+    }
+
+    // Игрок смотрит прямо на крысу, и между ними ничего нет
+    bool PlayerLooksAtMe(float minDot)
+    {
+        var cam = Camera.main;
+        if (cam == null) return false;
+        Vector3 me = transform.position + Vector3.up * 0.25f;
+        Vector3 dir = me - cam.transform.position;
+        if (Vector3.Dot(cam.transform.forward, dir.normalized) < minDot) return false;
+        // крыса у самого пола - последние 30 см луча не проверяем, иначе он цепляет пол
+        return !Physics.Raycast(cam.transform.position, dir.normalized, dir.magnitude - 0.3f, ~0, QueryTriggerInteraction.Ignore);
+    }
+
+    bool TryStartStare()
+    {
+        if (StareUsed || player == null || appear < 1f) return false;
+        if (QuestManager.Instance == null || QuestManager.Instance.PlayTime < 120f) return false;
+        float d = Vector3.Distance(player.position, transform.position);
+        if (d < 2.5f || d > 8f || !PlayerLooksAtMe(0.8f)) return false;
+        StareUsed = true;
+        staring = true;
+        stareStart = Time.time;
+        return true;
+    }
+
+    void Stare()
+    {
+        Vector3 cam = Camera.main != null ? Camera.main.transform.position : player.position;
+        FaceTo(cam, 240f);
+        if (animator != null)
+        {
+            if (animState != "Idle") { animState = "Idle"; animator.CrossFadeInFixedTime("Idle", 0.2f); }
+            animator.speed = 0.35f;   // почти не шевелится
+        }
+        if (audioSource != null) audioSource.volume = Mathf.MoveTowards(audioSource.volume, 0f, Time.deltaTime * 6f);
+
+        // Отвернулся (после пары секунд взгляда) или ушёл - крысы уже нет, мгновенно, без бега
+        bool looking = PlayerLooksAtMe(0.55f);
+        lookAway = looking ? 0f : lookAway + Time.deltaTime;
+        float d = Vector3.Distance(player.position, transform.position);
+        if ((Time.time - stareStart > 2f && lookAway > 0.35f) || d > 14f || Time.time - stareStart > 30f)
+            Destroy(gameObject);
     }
 
     void FaceTo(Vector3 target, float degPerSec)

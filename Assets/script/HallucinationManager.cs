@@ -5,18 +5,18 @@ using UnityEngine.AI;
 
 public class HallucinationManager : MonoBehaviour
 {
-    [Header("UI и Звук")]
+    [Header("UI Рё Р—РІСѓРє")]
     public Image jumpscareImage;
     public AudioSource audioSource;
     public AudioClip noiseSound;
     public AudioClip screamSound;
 
-    [Header("Сердцебиение")]
+    [Header("РЎРµСЂРґС†РµР±РёРµРЅРёРµ")]
     public AudioClip heartbeatSound;
-    public float maxHearDistance = 15f; // С какого расстояния начинается стук
+    public float maxHearDistance = 15f; // РЎ РєР°РєРѕРіРѕ СЂР°СЃСЃС‚РѕСЏРЅРёСЏ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃС‚СѓРє
 
-    [Header("Бабка")]
-    public GameObject realGhost; // ПЕРЕТАЩИ СЮДА НАСТОЯЩУЮ БАБКУ
+    [Header("Р‘Р°Р±РєР°")]
+    public GameObject realGhost; // РџР•Р Р•РўРђР©Р РЎР®Р”Рђ РќРђРЎРўРћРЇР©РЈР® Р‘РђР‘РљРЈ
 
     void Start()
     {
@@ -39,10 +39,10 @@ public class HallucinationManager : MonoBehaviour
 
         float dist = Vector3.Distance(realGhost.transform.position, playerObj.transform.position);
 
-        // Если бабка близко
+        // Р•СЃР»Рё Р±Р°Р±РєР° Р±Р»РёР·РєРѕ
         if (dist < maxHearDistance)
         {
-            // Включаем звук, если он еще не играет
+            // Р’РєР»СЋС‡Р°РµРј Р·РІСѓРє, РµСЃР»Рё РѕРЅ РµС‰Рµ РЅРµ РёРіСЂР°РµС‚
             if (!audioSource.isPlaying || audioSource.clip != heartbeatSound)
             {
                 audioSource.clip = heartbeatSound;
@@ -50,14 +50,14 @@ public class HallucinationManager : MonoBehaviour
                 audioSource.Play();
             }
 
-            // Чем ближе, тем громче (от 0 до 1) и быстрее (от 1 до 2)
+            // Р§РµРј Р±Р»РёР¶Рµ, С‚РµРј РіСЂРѕРјС‡Рµ (РѕС‚ 0 РґРѕ 1) Рё Р±С‹СЃС‚СЂРµРµ (РѕС‚ 1 РґРѕ 2)
             float proximity = 1f - (dist / maxHearDistance);
             audioSource.volume = Mathf.Lerp(0.1f, 1f, proximity);
             audioSource.pitch = Mathf.Lerp(1f, 1.8f, proximity);
         }
         else
         {
-            // Если бабка далеко, останавливаем стук
+            // Р•СЃР»Рё Р±Р°Р±РєР° РґР°Р»РµРєРѕ, РѕСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃС‚СѓРє
             if (audioSource.clip == heartbeatSound && audioSource.isPlaying)
             {
                 audioSource.Stop();
@@ -80,19 +80,23 @@ public class HallucinationManager : MonoBehaviour
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj == null) yield break;
 
-        // 1. СКРИМЕР
-        if (audioSource != null && screamSound != null)
-            audioSource.PlayOneShot(screamSound, 1f);
+        // 1. РЎРљР РРњР•Р : Р±Р°Р±РєР° Р±СЂРѕСЃР°РµС‚СЃСЏ РІ Р»РёС†Рѕ (3D), РєР°СЂС‚РёРЅРєР° - С‚РѕР»СЊРєРѕ Р·Р°РїР°СЃРЅРѕР№ РІР°СЂРёР°РЅС‚
+        if (realGhost != null && Camera.main != null)
+        {
+            GrannyJumpscare.Play(realGhost, screamSound);
+            yield return null;
+            while (GrannyJumpscare.IsPlaying) yield return null;
+        }
+        else
+        {
+            if (audioSource != null && screamSound != null)
+                audioSource.PlayOneShot(screamSound, 1f);
+            if (jumpscareImage != null) jumpscareImage.gameObject.SetActive(true);
+            yield return new WaitForSeconds(1.5f);
+            if (jumpscareImage != null) jumpscareImage.gameObject.SetActive(false);
+        }
 
-        if (jumpscareImage != null)
-            jumpscareImage.gameObject.SetActive(true);
-
-        yield return new WaitForSeconds(1.5f);
-
-        if (jumpscareImage != null)
-            jumpscareImage.gameObject.SetActive(false);
-
-        // 2. СПАВН БАБКИ
+        // 2. РЎРџРђР’Рќ Р‘РђР‘РљР
         if (realGhost != null)
         {
             realGhost.SetActive(true);

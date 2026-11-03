@@ -17,6 +17,8 @@ public class PlayerBodyAnimator : MonoBehaviour
     private Animator animator;
     private Vector3 lastPos;
     private float airTime;
+    private readonly System.Collections.Generic.List<Renderer> upperBody = new System.Collections.Generic.List<Renderer>();
+    private bool wasFirstPerson = true;
 
     static readonly int SpeedId = Animator.StringToHash("Speed");
     static readonly int MotionSpeedId = Animator.StringToHash("MotionSpeed");
@@ -30,6 +32,21 @@ public class PlayerBodyAnimator : MonoBehaviour
         if (controller == null) controller = GetComponentInParent<CharacterController>();
         if (playerController == null) playerController = GetComponentInParent<PlayerController>();
         lastPos = controller.transform.position;
+
+        // Голова, кепка, рубашка, рюкзак от первого лица рисуют только тень, иначе лезут в камеру
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+            if (r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) upperBody.Add(r);
+    }
+
+    // В катсцене (камера игрока выключена) охранника видно целиком
+    void LateUpdate()
+    {
+        var cam = playerController != null ? playerController.cameraTransform : null;
+        bool firstPerson = cam != null && cam.gameObject.activeInHierarchy;
+        if (firstPerson == wasFirstPerson) return;
+        wasFirstPerson = firstPerson;
+        var mode = firstPerson ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
+        foreach (var r in upperBody) if (r != null) r.shadowCastingMode = mode;
     }
 
     void Update()

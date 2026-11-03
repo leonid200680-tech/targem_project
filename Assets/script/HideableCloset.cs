@@ -1,46 +1,57 @@
 using System.Collections;
 using UnityEngine;
 
-// Шкаф-укрытие. По E (на дверцу или на сам шкаф) дверцы открываются, игрок залезает внутрь, дверцы закрываются.
-// Изнутри по E - дверцы открываются, игрок выходит. Пока игрок внутри, бабка его не видит и не может схватить.
-// Точки "внутри" и "выход" создаются сами по габаритам шкафа, если не заданы вручную.
+// РЁРєР°С„-СѓРєСЂС‹С‚РёРµ. РџРѕ E (РЅР° РґРІРµСЂС†Сѓ РёР»Рё РЅР° СЃР°Рј С€РєР°С„) РёРіСЂРѕРє РїР»Р°РІРЅРѕ Р·Р°Р»РµР·Р°РµС‚ РІРЅСѓС‚СЂСЊ, РґРІРµСЂС†С‹ РЅРµ РѕС‚РєСЂС‹РІР°СЋС‚СЃСЏ.
+// Р’РЅСѓС‚СЂРё РєР°РјРµСЂР° РЅР° СѓСЂРѕРІРЅРµ РіР»Р°Р·, СЃРјРѕС‚СЂРёС‚ РЅР° РґРІРµСЂС†С‹: СЃРєРІРѕР·СЊ С‰РµР»Рё СЂРµС€С‘С‚РєРё РІРёРґРЅРѕ РєРѕРјРЅР°С‚Сѓ, РјРѕР¶РЅРѕ С‡СѓС‚СЊ РѕСЃРјРѕС‚СЂРµС‚СЊСЃСЏ.
+// РР·РЅСѓС‚СЂРё РїРѕ E - РёРіСЂРѕРє РїР»Р°РІРЅРѕ РІС‹С…РѕРґРёС‚. РџРѕРєР° РёРіСЂРѕРє РІРЅСѓС‚СЂРё, Р±Р°Р±РєР° РµРіРѕ РЅРµ РІРёРґРёС‚ Рё РЅРµ РјРѕР¶РµС‚ СЃС…РІР°С‚РёС‚СЊ.
+// РўРѕС‡РєРё "РІРЅСѓС‚СЂРё" Рё "РІС‹С…РѕРґ" СЃРѕР·РґР°СЋС‚СЃСЏ СЃР°РјРё РїРѕ РіР°Р±Р°СЂРёС‚Р°Рј С€РєР°С„Р°, РµСЃР»Рё РЅРµ Р·Р°РґР°РЅС‹ РІСЂСѓС‡РЅСѓСЋ.
 public class HideableCloset : MonoBehaviour
 {
-    [Header("Настройки")]
-    public Transform hidePoint; // Точка внутри шкафа
-    public Transform exitPoint; // Точка, куда игрок выйдет (перед шкафом)
-    public string prompt = "Нажмите E, чтобы спрятаться";
-    public float eyeHeight = 1.4f;   // высота корня игрока над полом шкафа (как у HidePoint, расставленного вручную)
-    [Tooltip("Изнутри дверцы прозрачные (у модели одна сторона), поэтому на них изнутри ставится панель со щелями")]
+    [Header("РќР°СЃС‚СЂРѕР№РєРё")]
+    public Transform hidePoint; // РўРѕС‡РєР° РІРЅСѓС‚СЂРё С€РєР°С„Р° (РЅРѕРіРё РёРіСЂРѕРєР°)
+    public Transform exitPoint; // РўРѕС‡РєР°, РєСѓРґР° РёРіСЂРѕРє РІС‹Р№РґРµС‚ (РїРµСЂРµРґ С€РєР°С„РѕРј)
+    public string prompt = "РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ СЃРїСЂСЏС‚Р°С‚СЊСЃСЏ";
+    public float eyeHeight = 1.4f;   // РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ: РІС‹СЃРѕС‚Р° СЃС‡РёС‚Р°РµС‚СЃСЏ РїРѕ РіР°Р±Р°СЂРёС‚Р°Рј С€РєР°С„Р°
+    [Tooltip("РР·РЅСѓС‚СЂРё РґРІРµСЂС†С‹ РїСЂРѕР·СЂР°С‡РЅС‹Рµ (Сѓ РјРѕРґРµР»Рё РѕРґРЅР° СЃС‚РѕСЂРѕРЅР°), РїРѕСЌС‚РѕРјСѓ РЅР° РЅРёС… РёР·РЅСѓС‚СЂРё СЃС‚Р°РІРёС‚СЃСЏ РїР°РЅРµР»СЊ СЃРѕ С‰РµР»СЏРјРё")]
     public Material insideSlatsMaterial;
 
-    public static bool IsPlayerHidden = false; // Глобальный флаг: игрок в укрытии
+    [Header("Р’РЅСѓС‚СЂРё")]
+    public float enterTime = 0.75f;
+    public float exitTime = 0.55f;
+    public float lookYaw = 45f;      // РЅР°СЃРєРѕР»СЊРєРѕ РјРѕР¶РЅРѕ РїРѕРІРµСЂРЅСѓС‚СЊ РіРѕР»РѕРІСѓ РІРЅСѓС‚СЂРё
+    public float lookPitch = 25f;
+
+    public static bool IsPlayerHidden = false; // Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ С„Р»Р°Рі: РёРіСЂРѕРє РІ СѓРєСЂС‹С‚РёРё
+    // РћРґРёРЅ СЂР°Р· Р·Р° РёРіСЂСѓ Р±Р°Р±РєР° РїРѕРґС…РѕРґРёС‚ Рє С€РєР°С„Сѓ, РіРґРµ СЃРёРґРёС‚ РёРіСЂРѕРє, Рё Р·Р°РіР»СЏРґС‹РІР°РµС‚ РІ СЂРµС€С‘С‚РєСѓ (РЅРѕ РЅРµ С‚СЂРѕРіР°РµС‚)
+    public static bool PeekUsed = false;
 
     private bool isPlayerInside = false;
     private bool moving = false;
     private int enteredFrame = -1;
     private GameObject playerObj;
     private PlayerController pc;
-    private InteractableDoor[] doors;
     private GameObject slats;
+    private Vector3 front = Vector3.forward;
+    private Vector3 frontDoorPoint;   // С‚РѕС‡РєР° РїРµСЂРµРґ РґРІРµСЂС†Р°РјРё, С‡РµСЂРµР· РЅРµС‘ РїСЂРѕС…РѕРґРёС‚ РїСѓС‚СЊ РІРЅСѓС‚СЂСЊ Рё РЅР°СЂСѓР¶Сѓ
+    private float lookX, lookY;
 
     void Start()
     {
         playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null) pc = playerObj.GetComponent<PlayerController>();
-        doors = GetComponentsInChildren<InteractableDoor>(true);
         BuildPoints();
     }
 
-    // Внутренняя точка - центр шкафа, лицом к дверцам; выход - перед дверцами
+    // Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ С‚РѕС‡РєР° - С†РµРЅС‚СЂ С€РєР°С„Р°, Р»РёС†РѕРј Рє РґРІРµСЂС†Р°Рј; РІС‹С…РѕРґ - РїРµСЂРµРґ РґРІРµСЂС†Р°РјРё
     void BuildPoints()
     {
+        var doors = GetComponentsInChildren<InteractableDoor>(true);
         var body = transform.Find("Cube");
         var r = body != null ? body.GetComponent<Renderer>() : GetComponentInChildren<Renderer>();
         if (r == null) return;
         Bounds b = r.bounds;
 
-        Vector3 front = Vector3.zero;
+        front = Vector3.zero;
         foreach (var d in doors)
         {
             var dr = d.GetComponent<Renderer>();
@@ -54,7 +65,7 @@ public class HideableCloset : MonoBehaviour
         if (Physics.Raycast(b.center, Vector3.down, out RaycastHit hit, 4f, ~0, QueryTriggerInteraction.Ignore)) floor = hit.point.y;
         float depth = Mathf.Abs(Vector3.Dot(b.extents, new Vector3(Mathf.Abs(front.x), 0f, Mathf.Abs(front.z))));
 
-        // Панель со щелями изнутри на дверцах: сквозь щели видно комнату, как в хоррорах
+        // РџР°РЅРµР»СЊ СЃРѕ С‰РµР»СЏРјРё РёР·РЅСѓС‚СЂРё РЅР° РґРІРµСЂС†Р°С…: СЃРєРІРѕР·СЊ С‰РµР»Рё РІРёРґРЅРѕ РєРѕРјРЅР°С‚Сѓ, РєР°Рє РІ С…РѕСЂСЂРѕСЂР°С…
         if (insideSlatsMaterial != null && transform.Find("Inside Slats") == null && doors.Length > 0)
         {
             Bounds db = doors[0].GetComponent<Renderer>().bounds;
@@ -64,38 +75,46 @@ public class HideableCloset : MonoBehaviour
             q.name = "Inside Slats";
             q.transform.SetParent(transform, true);
             Vector3 c = db.center - front * (Mathf.Abs(Vector3.Dot(db.extents, new Vector3(Mathf.Abs(front.x), 0f, Mathf.Abs(front.z)))) + 0.02f);
-            q.transform.SetPositionAndRotation(c, Quaternion.LookRotation(front));   // лицом внутрь шкафа (квад виден со стороны -forward)
+            q.transform.SetPositionAndRotation(c, Quaternion.LookRotation(front));   // Р»РёС†РѕРј РІРЅСѓС‚СЂСЊ С€РєР°С„Р° (РєРІР°Рґ РІРёРґРµРЅ СЃРѕ СЃС‚РѕСЂРѕРЅС‹ -forward)
             Vector3 side = Vector3.Cross(Vector3.up, front);
             float width = Mathf.Abs(Vector3.Dot(db.size, new Vector3(Mathf.Abs(side.x), 0f, Mathf.Abs(side.z))));
             q.transform.localScale = new Vector3(width, db.size.y, 1f);
             var qr = q.GetComponent<MeshRenderer>();
             qr.sharedMaterial = insideSlatsMaterial;
             qr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            q.SetActive(false);   // видна только пока игрок внутри
+            q.SetActive(false);   // РІРёРґРЅР° С‚РѕР»СЊРєРѕ РїРѕРєР° РёРіСЂРѕРє РІРЅСѓС‚СЂРё
             slats = q;
         }
 
+        // РќРѕРіРё РёРіСЂРѕРєР° - РЅР° РїРѕР»Сѓ С€РєР°С„Р°, С‡СѓС‚СЊ РїРѕР·Р°РґРё С†РµРЅС‚СЂР°, С‡С‚РѕР±С‹ РіР»Р°Р·Р° Р±С‹Р»Рё РІРЅСѓС‚СЂРё Рё РґРІРµСЂС†С‹ РїРµСЂРµРґ Р»РёС†РѕРј.
+        // Р•СЃР»Рё С€РєР°С„ РЅРёР·РєРёР№, РѕРїСѓСЃРєР°РµРј С‚Р°Рє, С‡С‚РѕР±С‹ РєР°РјРµСЂР° Р±С‹Р»Р° РїРѕРґ РєСЂС‹С€РµР№.
+        float camHeight = CameraHeight();
+        float rootY = Mathf.Min(floor + 0.02f, b.max.y - 0.22f - camHeight);
+        Vector3 inside = new Vector3(b.center.x, rootY, b.center.z) - front * Mathf.Min(0.1f, depth * 0.2f);
         if (hidePoint == null)
         {
             hidePoint = new GameObject("HidePoint").transform;
             hidePoint.SetParent(transform, true);
-            hidePoint.SetPositionAndRotation(new Vector3(b.center.x, floor + eyeHeight, b.center.z), Quaternion.LookRotation(front));
         }
+        hidePoint.SetPositionAndRotation(inside, Quaternion.LookRotation(front));
+
+        frontDoorPoint = new Vector3(b.center.x, floor + 0.02f, b.center.z) + front * (depth + 0.45f);
+
         if (exitPoint == null)
         {
             exitPoint = new GameObject("exit point").transform;
             exitPoint.SetParent(transform, true);
-            Vector3 basePos = new Vector3(b.center.x, floor + eyeHeight, b.center.z);
+            Vector3 basePos = new Vector3(b.center.x, floor + 0.05f, b.center.z);
             Vector3 side = Vector3.Cross(Vector3.up, front);
             Vector3 p = basePos + front * (depth + 0.75f);
-            // Перед шкафом может стоять мебель: ищем свободное место чуть дальше или сбоку
+            // РџРµСЂРµРґ С€РєР°С„РѕРј РјРѕР¶РµС‚ СЃС‚РѕСЏС‚СЊ РјРµР±РµР»СЊ: РёС‰РµРј СЃРІРѕР±РѕРґРЅРѕРµ РјРµСЃС‚Рѕ С‡СѓС‚СЊ РґР°Р»СЊС€Рµ РёР»Рё СЃР±РѕРєСѓ
             foreach (float dist in new[] { 0.75f, 1.0f, 1.3f })
             {
                 bool found = false;
                 foreach (float s in new[] { 0f, 0.5f, -0.5f, 0.9f, -0.9f })
                 {
                     Vector3 q = basePos + front * (depth + dist) + side * s;
-                    if (!Physics.CheckCapsule(q + Vector3.down * 0.9f, q + Vector3.up * 0.4f, 0.3f, ~0, QueryTriggerInteraction.Ignore))
+                    if (!Physics.CheckCapsule(q + Vector3.up * 0.45f, q + Vector3.up * 1.6f, 0.3f, ~0, QueryTriggerInteraction.Ignore))
                     { p = q; found = true; break; }
                 }
                 if (found) break;
@@ -104,11 +123,40 @@ public class HideableCloset : MonoBehaviour
         }
     }
 
+    // Р’С‹СЃРѕС‚Р° РєР°РјРµСЂС‹ РЅР°Рґ РЅРѕРіР°РјРё РёРіСЂРѕРєР°
+    float CameraHeight()
+    {
+        FindPlayer();
+        if (pc != null && pc.cameraTransform != null)
+            return pc.cameraTransform.position.y - pc.transform.position.y;
+        return 1.64f;
+    }
+
+    void FindPlayer()
+    {
+        // РРіСЂРѕРє РІС‹РєР»СЋС‡РµРЅ, РїРѕРєР° РѕС‚РєСЂС‹С‚Рѕ РіР»Р°РІРЅРѕРµ РјРµРЅСЋ, РїРѕСЌС‚РѕРјСѓ РёС‰РµРј РµРіРѕ Р»РµРЅРёРІРѕ
+        if (pc != null) return;
+        pc = FindAnyObjectByType<PlayerController>(FindObjectsInactive.Include);
+        if (pc != null) playerObj = pc.gameObject;
+    }
+
     void Update()
     {
-        // Выход из шкафа (не в тот же кадр, когда залезли)
-        if (isPlayerInside && !moving && Time.frameCount != enteredFrame && Input.GetKeyDown(KeyCode.E))
+        if (!isPlayerInside || moving) return;
+
+        // Р’С‹С…РѕРґ РёР· С€РєР°С„Р° (РЅРµ РІ С‚РѕС‚ Р¶Рµ РєР°РґСЂ, РєРѕРіРґР° Р·Р°Р»РµР·Р»Рё)
+        if (Time.frameCount != enteredFrame && Input.GetKeyDown(KeyCode.E) && !PauseMenu.GameIsPaused)
+        {
             StartCoroutine(ExitRoutine());
+            return;
+        }
+
+        // Р’РЅСѓС‚СЂРё РјРѕР¶РЅРѕ РЅРµРјРЅРѕРіРѕ РѕСЃРјРѕС‚СЂРµС‚СЊСЃСЏ
+        if (PauseMenu.GameIsPaused || pc == null || pc.cameraTransform == null) return;
+        lookX = Mathf.Clamp(lookX + Input.GetAxis("Mouse X") * GameSettings.MouseSensitivity, -lookYaw, lookYaw);
+        lookY = Mathf.Clamp(lookY - Input.GetAxis("Mouse Y") * GameSettings.MouseSensitivity, -lookPitch, lookPitch);
+        playerObj.transform.rotation = hidePoint.rotation * Quaternion.Euler(0f, lookX, 0f);
+        SetPitch(lookY);
     }
 
     public void Interact()
@@ -116,59 +164,123 @@ public class HideableCloset : MonoBehaviour
         if (!isPlayerInside && !moving && !IsPlayerHidden) StartCoroutine(EnterRoutine());
     }
 
-    void SetDoors(bool open)
+    void SetPitch(float x)
     {
-        foreach (var d in doors) d.SetOpen(open);
+        pc.Pitch = x;
+        var e = pc.cameraTransform.localEulerAngles;
+        pc.cameraTransform.localEulerAngles = new Vector3(x, e.y, e.z);
     }
 
     IEnumerator EnterRoutine()
     {
-        // Игрок выключен, пока открыто главное меню, поэтому ищем его здесь, а не в Start
-        if (pc == null)
-        {
-            pc = FindAnyObjectByType<PlayerController>();
-            if (pc != null) playerObj = pc.gameObject;
-        }
+        FindPlayer();
         if (pc == null || hidePoint == null) yield break;
         moving = true;
         isPlayerInside = true;
         enteredFrame = Time.frameCount;
         pc.enabled = false;
-        SetDoors(true);
-        yield return new WaitForSeconds(0.35f);
+        IsPlayerHidden = true; // РРіСЂРѕРє РЅРµРІРёРґРёРј РґР»СЏ Р±Р°Р±РєРё
+        lookX = lookY = 0f;
+        // Р”РІРµСЂС†С‹ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ Р·Р°РєСЂС‹С‚С‹: РёРіСЂРѕРє РїСЂРѕС…РѕРґРёС‚ СЃРєРІРѕР·СЊ РЅРёС…, РІРЅСѓС‚СЂРё РІРёРґРЅР° СЂРµС€С‘С‚РєР°
+        foreach (var d in GetComponentsInChildren<InteractableDoor>(true)) d.SetOpen(false);
 
-        IsPlayerHidden = true; // Игрок невидим для бабки
-        Teleport(hidePoint);
-        yield return new WaitForSeconds(0.25f);
-        SetDoors(false);
-        yield return new WaitForSeconds(0.2f);
-        if (slats != null) slats.SetActive(true);
-        yield return new WaitForSeconds(0.3f);
+        // РџРѕРґС…РѕРґРёРј Рє РґРІРµСЂС†Р°Рј Рё РїР»Р°РІРЅРѕ "РїСЂРѕСЃРєР°Р»СЊР·С‹РІР°РµРј" РІРЅСѓС‚СЂСЊ, СЂР°Р·РІРѕСЂР°С‡РёРІР°СЏСЃСЊ Р»РёС†РѕРј Рє РґРІРµСЂС†Р°Рј
+        yield return Glide(new[] { frontDoorPoint, hidePoint.position }, hidePoint.rotation, 0f, enterTime);
         moving = false;
+
+        if (!PeekUsed) StartCoroutine(GrannyPeek());
+    }
+
+    // Р‘Р°Р±РєР° СЂСЏРґРѕРј (РїРѕ РїСѓС‚Рё РЅРµ РґР°Р»СЊС€Рµ 30 Рј) - С‡РµСЂРµР· РїР°СЂСѓ СЃРµРєСѓРЅРґ РѕРЅР° РїРѕРґС…РѕРґРёС‚ Рё Р·Р°РіР»СЏРґС‹РІР°РµС‚ РІ С‰РµР»Рё
+    IEnumerator GrannyPeek()
+    {
+        yield return new WaitForSeconds(Random.Range(1.5f, 3f));
+        if (!isPlayerInside || PeekUsed) yield break;
+        var chase = FindAnyObjectByType<GhostChase>();
+        if (chase == null) yield break;
+        if (!chase.TryPeekCloset(frontDoorPoint, -front, Random.Range(4.5f, 6f))) yield break;
+        PeekUsed = true;
+
+        // Р’СЃС‚Р°Р»Р° Сѓ РґРІРµСЂРµС†, Р»РёС†Рѕ Сѓ СЃР°РјРѕР№ СЂРµС€С‘С‚РєРё. РџР°СЂСѓ СЂР°Р· РґС‘СЂРіР°РµС‚ РґРІРµСЂС†Сѓ, Р±СѓРґС‚Рѕ РїСЂРѕР±СѓРµС‚ РѕС‚РєСЂС‹С‚СЊ - Рё РЅРµ РѕС‚РєСЂС‹РІР°РµС‚.
+        while (chase != null && chase.Scripted && !chase.Peeking) yield return null;
+        if (chase == null || !chase.Peeking) yield break;
+        InteractableDoor door = null;
+        foreach (var d in GetComponentsInChildren<InteractableDoor>(true))
+            if (door == null || Vector3.Distance(d.transform.position, chase.transform.position) < Vector3.Distance(door.transform.position, chase.transform.position)) door = d;
+        if (door == null) yield break;
+        float speed = door.speed;
+        door.speed = 14f;
+        yield return new WaitForSeconds(1.6f);
+        for (int i = 0; i < 2 && chase.Peeking; i++)
+        {
+            door.SetAjar(0.02f);
+            yield return new WaitForSeconds(0.12f);
+            door.SetOpen(false);
+            yield return new WaitForSeconds(0.5f);
+        }
+        while (chase.Peeking) yield return null;
+        door.speed = speed;
     }
 
     IEnumerator ExitRoutine()
     {
         moving = true;
         if (slats != null) slats.SetActive(false);
-        SetDoors(true);
-        yield return new WaitForSeconds(0.35f);
+        Quaternion outRot = exitPoint != null ? exitPoint.rotation : playerObj.transform.rotation;
+        Vector3 target = exitPoint != null ? exitPoint.position : frontDoorPoint;
+        yield return Glide(new[] { frontDoorPoint, target }, outRot, 0f, exitTime);
 
-        IsPlayerHidden = false; // Игрок снова видим
-        if (exitPoint != null) Teleport(exitPoint);
+        IsPlayerHidden = false; // РРіСЂРѕРє СЃРЅРѕРІР° РІРёРґРёРј
         isPlayerInside = false;
         if (pc != null) pc.enabled = true;
-        yield return new WaitForSeconds(0.5f);
-        SetDoors(false);
         moving = false;
     }
 
-    void Teleport(Transform point)
+    // РџР»Р°РІРЅРѕРµ РїРµСЂРµРјРµС‰РµРЅРёРµ РёРіСЂРѕРєР° РїРѕ Р»РѕРјР°РЅРѕР№ (СЃ РІС‹РєР»СЋС‡РµРЅРЅС‹Рј CharacterController), РїРѕРІРѕСЂРѕС‚ Рё РЅР°РєР»РѕРЅ РєР°РјРµСЂС‹
+    IEnumerator Glide(Vector3[] points, Quaternion endRot, float endPitch, float time)
     {
-        CharacterController cc = playerObj.GetComponent<CharacterController>();
+        var cc = playerObj.GetComponent<CharacterController>();
         if (cc != null) cc.enabled = false;
-        playerObj.transform.SetPositionAndRotation(point.position, point.rotation);
+
+        var t0 = playerObj.transform;
+        Vector3 start = t0.position;
+        Quaternion startRot = t0.rotation;
+        float startPitch = pc.Pitch;
+
+        // Р”Р»РёРЅС‹ РѕС‚СЂРµР·РєРѕРІ, С‡С‚РѕР±С‹ СЃРєРѕСЂРѕСЃС‚СЊ РїРѕ РїСѓС‚Рё Р±С‹Р»Р° СЂРѕРІРЅРѕР№
+        var path = new Vector3[points.Length + 1];
+        path[0] = start;
+        for (int i = 0; i < points.Length; i++) path[i + 1] = points[i];
+        float total = 0f;
+        for (int i = 1; i < path.Length; i++) total += Vector3.Distance(path[i - 1], path[i]);
+
+        float t = 0f;
+        while (t < time)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / time));
+            t0.position = AlongPath(path, total, k);
+            t0.rotation = Quaternion.Slerp(startRot, endRot, Mathf.Clamp01(k * 1.4f));
+            SetPitch(Mathf.Lerp(startPitch, endPitch, k));
+            yield return null;
+        }
+        t0.SetPositionAndRotation(path[path.Length - 1], endRot);
+        SetPitch(endPitch);
+
         if (cc != null) cc.enabled = true;
+    }
+
+    static Vector3 AlongPath(Vector3[] path, float total, float k)
+    {
+        float d = k * total;
+        for (int i = 1; i < path.Length; i++)
+        {
+            float seg = Vector3.Distance(path[i - 1], path[i]);
+            if (d <= seg || i == path.Length - 1)
+                return Vector3.Lerp(path[i - 1], path[i], seg > 1e-4f ? Mathf.Clamp01(d / seg) : 1f);
+            d -= seg;
+        }
+        return path[path.Length - 1];
     }
 
     void OnDisable()

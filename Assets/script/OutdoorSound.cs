@@ -12,13 +12,18 @@ public class OutdoorSound : MonoBehaviour
     public float insideCutoff = 600f;
     public float fadeSpeed = 2f;
 
+    // Концовка: уличные звуки (генератор, качели) затихают совсем. Музыку (insideCutoff = 22000) не трогаем.
+    public static bool EndingSilence;
+
     private AudioSource source;
     private AudioLowPassFilter lowPass;
     private float baseVolume;
     private float inside;
+    private float silence;
 
     void Awake()
     {
+        EndingSilence = false;
         source = GetComponent<AudioSource>();
         baseVolume = source.volume;
         lowPass = GetComponent<AudioLowPassFilter>();
@@ -28,11 +33,20 @@ public class OutdoorSound : MonoBehaviour
 
     void Update()
     {
+        // В катсцене основная камера выключена - берём того слушателя, что сейчас работает
         var cam = Camera.main;
-        bool listenerInside = cam != null && buildingZone.Contains(cam.transform.position);
+        Transform listener = cam != null ? cam.transform : null;
+        if (listener == null)
+        {
+            var l = FindAnyObjectByType<AudioListener>();
+            if (l != null) listener = l.transform;
+        }
+        bool listenerInside = listener != null && buildingZone.Contains(listener.position);
         inside = Mathf.MoveTowards(inside, listenerInside ? 1f : 0f, Time.deltaTime * fadeSpeed);
 
-        source.volume = baseVolume * Mathf.Lerp(1f, insideVolume, inside);
+        if (EndingSilence && insideCutoff < 20000f)
+            silence = Mathf.MoveTowards(silence, 1f, Time.unscaledDeltaTime * 0.7f);
+        source.volume = baseVolume * Mathf.Lerp(1f, insideVolume, inside) * (1f - silence);
         // Частота среза меняется по экспоненте, чтобы переход на слух был ровным
         lowPass.cutoffFrequency = Mathf.Exp(Mathf.Lerp(Mathf.Log(22000f), Mathf.Log(insideCutoff), inside));
     }

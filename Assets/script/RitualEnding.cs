@@ -56,6 +56,7 @@ public class RitualEnding : MonoBehaviour
     public IEnumerator Play()
     {
         IsPlaying = true;
+        OutdoorSound.EndingSilence = true;
         var p = pentagram;
 
         // Игрок больше не управляет, пауза недоступна
