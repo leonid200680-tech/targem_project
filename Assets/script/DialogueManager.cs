@@ -34,7 +34,7 @@ public class DialogueManager : MonoBehaviour
     private void Update()
     {
         // По клику мыши или пробелу переключаем реплики
-        if (IsDialogueActive && Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
+        if (IsDialogueActive && (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)))
         {
             if (isTyping)
             {

@@ -42,7 +42,7 @@ public class LighterInHands : MonoBehaviour
         }
 
         // Поджигаем по нажатию ЛКМ
-        if (isSelected && Input.GetMouseButtonDown(0))
+        if (isSelected && Input.GetMouseButtonDown(0) && !DialogueManager.IsDialogueActive && !PauseMenu.GameIsPaused)
         {
             ToggleLighter();
         }

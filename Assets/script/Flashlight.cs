@@ -45,7 +45,7 @@ public class Flashlight : MonoBehaviour
 
         // Включение по ЛКМ (как зажигалка) или по F
         bool toggle = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.F);
-        if (toggle && isSelected && currentCharge > 0 && !PauseMenu.GameIsPaused)
+        if (toggle && isSelected && currentCharge > 0 && !PauseMenu.GameIsPaused && !DialogueManager.IsDialogueActive)
         {
             isOn = !isOn;
             if (spotLight != null) spotLight.enabled = isOn;
