@@ -206,8 +206,20 @@ public static class GameplayItemsBuilder
     {
         Random.InitState(seed);
         var result = new List<Vector3>();
-        for (int tries = 0; tries < 400 && result.Count < count; tries++)
+        for (int tries = 0; tries < 2000 && result.Count < count; tries++)
         {
+            // Сначала столы и коробки на виду; пол - только если их не хватило
+            if (tries < 1600)
+            {
+                if (SurfaceSpot(floor, out var top))
+                {
+                    bool apart = true;
+                    foreach (var r in result) if (Vector3.Distance(r, top) < 4f) apart = false;
+                    foreach (var pi in Object.FindObjectsByType<PickupItem>(FindObjectsSortMode.None)) if (Vector3.Distance(pi.transform.position, top) < 1f) apart = false;
+                    if (apart) result.Add(top);
+                }
+                continue;
+            }
             var p = new Vector3(Random.Range(Building.xMin, Building.xMax), FloorY[floor] + 0.5f, Random.Range(Building.yMin, Building.yMax));
             if (!NavMesh.SamplePosition(p, out var hit, 1.5f, NavMesh.AllAreas)) continue;
             if (Mathf.Abs(hit.position.y - FloorY[floor]) > 0.25f) continue;
@@ -224,6 +236,28 @@ public static class GameplayItemsBuilder
             if (far) result.Add(q);
         }
         return result;
+    }
+
+    // Случайная точка на столе, коробке или полке, которую видно с высоты глаз игрока
+    static bool SurfaceSpot(int floor, out Vector3 point)
+    {
+        point = default;
+        float x = Random.Range(Building.xMin, Building.xMax), z = Random.Range(Building.yMin, Building.yMax);
+        if (z < -9f && (x < -29.5f || (x > -9.8f && x < -5.3f) || x > 22.5f)) return false;   // лестничные клетки
+        var from = new Vector3(x, FloorY[floor] + 2.2f, z);
+        if (!Physics.Raycast(from, Vector3.down, out var hit, 2.2f, ~0, QueryTriggerInteraction.Ignore) || hit.normal.y < 0.97f) return false;
+        float height = hit.point.y - FloorY[floor];
+        if (height < 0.4f || height > 1.5f || hit.collider.GetComponentInParent<PickupItem>() != null) return false;
+        string name = hit.collider.name.ToLower();
+        bool furniture = false;
+        foreach (var word in new[] { "стол", "table", "короб", "desk", "полк", "shelf", "box", "тумб" }) furniture |= name.Contains(word);
+        if (!furniture) return false;
+        foreach (var d in new[] { Vector3.right, Vector3.left, Vector3.forward, Vector3.back })
+            if (!Physics.Raycast(from + d * 0.12f, Vector3.down, out var side, 2.2f, ~0, QueryTriggerInteraction.Ignore) || Mathf.Abs(side.point.y - hit.point.y) > 0.01f) return false;
+        if (!NavMesh.SamplePosition(new Vector3(x, FloorY[floor], z), out var nav, 1.1f, NavMesh.AllAreas) || Mathf.Abs(nav.position.y - FloorY[floor]) > 0.3f) return false;
+        if (Physics.Linecast(nav.position + Vector3.up * 1.6f, hit.point + Vector3.up * 0.1f, ~0, QueryTriggerInteraction.Ignore)) return false;
+        point = hit.point;
+        return true;
     }
 
     static Vector3 TrailerSpot(Vector3 near)

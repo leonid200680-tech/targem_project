@@ -164,6 +164,11 @@ public class ScareDirector : MonoBehaviour
     }
 
     // ---------- Фонарик гаснет, рядом кто-то шаркает ----------
+    public void StoneScare()
+    {
+        if (!busy && flashlight != null && flashlight.IsOn && pc != null) StartCoroutine(Blackout());
+    }
+
     IEnumerator Blackout()
     {
         busy = true;

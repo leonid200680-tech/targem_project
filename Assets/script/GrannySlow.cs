@@ -16,6 +16,8 @@ public class GrannySlow : MonoBehaviour
     private float stunUntil;
     private float factor = 1f;
 
+    [HideInInspector] public float animRate = 1f;   // темп анимации, задаёт GhostChase (ползком)
+
     public bool IsSlowed => Time.time < slowUntil;
 
     void Awake()
@@ -39,6 +41,6 @@ public class GrannySlow : MonoBehaviour
         bool slowed = Time.time < slowUntil;
         if (Time.time < stunUntil) agent.speed = 0.05f;
         else if (slowed) agent.speed *= factor;
-        if (anim != null) anim.speed = slowed ? Mathf.Lerp(0.5f, 1f, factor) : 1f;
+        if (anim != null) anim.speed = (slowed ? Mathf.Lerp(0.5f, 1f, factor) : 1f) * animRate;
     }
 }

@@ -2,16 +2,17 @@ using UnityEngine;
 
 public class PhoneController : MonoBehaviour
 {
-    [Header("Настройки звонка")]
-    public AudioSource ringAudioSource;      // Источник звука гудков
-    public DialogueTrigger dialogueTrigger;  // Ссылка на скрипт диалога
+    [Header("РќР°СЃС‚СЂРѕР№РєРё Р·РІРѕРЅРєР°")]
+    public AudioSource ringAudioSource;      // РСЃС‚РѕС‡РЅРёРє Р·РІСѓРєР° РіСѓРґРєРѕРІ
+    public DialogueTrigger dialogueTrigger;  // РЎСЃС‹Р»РєР° РЅР° СЃРєСЂРёРїС‚ РґРёР°Р»РѕРіР°
 
-    [Header("Вибрация")]
-    public float shakeIntensity = 0.005f;    // Сила тряски (не делай слишком большой)
-    public float shakeSpeed = 50f;           // Скорость тряски
+    [Header("Р’РёР±СЂР°С†РёСЏ")]
+    public float shakeIntensity = 0.005f;    // РЎРёР»Р° С‚СЂСЏСЃРєРё (РЅРµ РґРµР»Р°Р№ СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№)
+    public float shakeSpeed = 50f;           // РЎРєРѕСЂРѕСЃС‚СЊ С‚СЂСЏСЃРєРё
 
     private Vector3 originalPosition;
     private bool isRinging = false;
+    private Light glow;   // СЌРєСЂР°РЅ СЃРІРµС‚РёС‚СЃСЏ, С‡С‚РѕР±С‹ С‚РµР»РµС„РѕРЅ Р±С‹Р» Р·Р°РјРµС‚РµРЅ РЅР° СЃС‚РѕР»Рµ
 
     void Start()
     {
@@ -21,9 +22,14 @@ public class PhoneController : MonoBehaviour
 
     void Update()
     {
+        if (glow != null)
+        {
+            glow.enabled = isRinging;
+            glow.intensity = Mathf.Lerp(40f, 160f, Mathf.PingPong(Time.time * 2f, 1f));
+        }
         if (isRinging)
         {
-            // Формула тряски (вибрация)
+            // Р¤РѕСЂРјСѓР»Р° С‚СЂСЏСЃРєРё (РІРёР±СЂР°С†РёСЏ)
             Vector3 shake = new Vector3(
                 Mathf.Sin(Time.time * shakeSpeed) * shakeIntensity,
                 Mathf.Cos(Time.time * shakeSpeed * 1.2f) * shakeIntensity,
@@ -33,14 +39,28 @@ public class PhoneController : MonoBehaviour
         }
         else
         {
-            // Возвращаем на место, если не звонит
+            // Р’РѕР·РІСЂР°С‰Р°РµРј РЅР° РјРµСЃС‚Рѕ, РµСЃР»Рё РЅРµ Р·РІРѕРЅРёС‚
             transform.localPosition = originalPosition;
         }
+    }
+
+    void MakeGlow()
+    {
+        var go = new GameObject("Phone Glow");
+        go.transform.position = transform.position + Vector3.up * 0.2f;
+        glow = go.AddComponent<Light>();
+        go.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalLightData>();
+        glow.type = LightType.Point;
+        glow.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
+        glow.range = 3f;
+        glow.color = new Color(0.6f, 0.8f, 1f);
+        glow.shadows = LightShadows.None;
     }
 
     public void StartRinging()
     {
         if (isRinging) return;
+        if (glow == null) MakeGlow();
 
         isRinging = true;
         if (ringAudioSource != null) ringAudioSource.Play();

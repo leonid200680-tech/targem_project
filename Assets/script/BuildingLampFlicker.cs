@@ -46,7 +46,7 @@ public class BuildingLampFlicker : MonoBehaviour
         float noise = Mathf.PerlinNoise(t * 7f, seed) * 0.7f + Mathf.PerlinNoise(t * 31f, seed + 3f) * 0.3f;
         float k = state * (1f - hum + hum * noise);
         if (lamp != null) lamp.intensity = intensity * k;
-        if (buzz != null) buzz.volume = buzzVolume * (state > 0.5f ? 1f : 0f);
+        if (buzz != null) buzz.volume = buzzVolume * (state > 0.5f ? 1f : 0f) * (1f - OutdoorSound.Hush);
     }
 
     IEnumerator FlickerRoutine()

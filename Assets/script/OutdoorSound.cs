@@ -15,6 +15,14 @@ public class OutdoorSound : MonoBehaviour
     // Концовка: уличные звуки (генератор, качели) затихают совсем. Музыку (insideCutoff = 22000) не трогаем.
     public static bool EndingSilence;
 
+    // Тишина перед событием: музыка и уличный фон пропадают на время. Шаги и дыхание не трогаем
+    private static float hushUntil;
+    public static void HushFor(float seconds) => hushUntil = Mathf.Max(hushUntil, Time.time + seconds);
+    private static float hush;
+    private static int hushFrame = -1;
+    // Насколько сейчас приглушён фон: 0 - обычно, 1 - тишина. Им же глушатся лампы
+    public static float Hush => hush;
+
     private AudioSource source;
     private AudioLowPassFilter lowPass;
     private float baseVolume;
@@ -24,6 +32,8 @@ public class OutdoorSound : MonoBehaviour
     void Awake()
     {
         EndingSilence = false;
+        hushUntil = 0f;
+        hush = 0f;
         source = GetComponent<AudioSource>();
         baseVolume = source.volume;
         lowPass = GetComponent<AudioLowPassFilter>();
@@ -46,7 +56,13 @@ public class OutdoorSound : MonoBehaviour
 
         if (EndingSilence && insideCutoff < 20000f)
             silence = Mathf.MoveTowards(silence, 1f, Time.unscaledDeltaTime * 0.7f);
-        source.volume = baseVolume * Mathf.Lerp(1f, insideVolume, inside) * (1f - silence);
+        if (hushFrame != Time.frameCount)
+        {
+            hushFrame = Time.frameCount;
+            bool hushed = Time.time < hushUntil;
+            hush = Mathf.MoveTowards(hush, hushed ? 1f : 0f, Time.deltaTime * (hushed ? 3.5f : 0.7f));
+        }
+        source.volume = baseVolume * Mathf.Lerp(1f, insideVolume, inside) * (1f - silence) * (1f - hush);
         // Частота среза меняется по экспоненте, чтобы переход на слух был ровным
         lowPass.cutoffFrequency = Mathf.Exp(Mathf.Lerp(Mathf.Log(22000f), Mathf.Log(insideCutoff), inside));
     }

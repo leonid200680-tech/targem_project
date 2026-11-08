@@ -7,16 +7,16 @@ using System.Collections.Generic;
 public class DialogueManager : MonoBehaviour
 {
     public static DialogueManager Instance { get; private set; }
-    public static bool IsDialogueActive { get; private set; } = false; // Чтобы игрок не ходил во время диалога
+    public static bool IsDialogueActive { get; private set; } = false; // Р§С‚РѕР±С‹ РёРіСЂРѕРє РЅРµ С…РѕРґРёР» РІРѕ РІСЂРµРјСЏ РґРёР°Р»РѕРіР°
 
-    [Header("UI Элементы")]
+    [Header("UI Р­Р»РµРјРµРЅС‚С‹")]
     public GameObject dialoguePanel;
     public TextMeshProUGUI speakerNameText;
     public TextMeshProUGUI dialogueText;
     public AudioSource voiceSource;
 
-    [Header("Настройки")]
-    public float typingSpeed = 0.05f; // Скорость печати текста
+    [Header("РќР°СЃС‚СЂРѕР№РєРё")]
+    public float typingSpeed = 0.05f; // РЎРєРѕСЂРѕСЃС‚СЊ РїРµС‡Р°С‚Рё С‚РµРєСЃС‚Р°
 
     private Queue<DialogueLine> dialogueQueue = new Queue<DialogueLine>();
     private bool isTyping = false;
@@ -24,7 +24,7 @@ public class DialogueManager : MonoBehaviour
 
     private void Awake()
     {
-        IsDialogueActive = false; // сброс после перезагрузки сцены
+        IsDialogueActive = false; // СЃР±СЂРѕСЃ РїРѕСЃР»Рµ РїРµСЂРµР·Р°РіСЂСѓР·РєРё СЃС†РµРЅС‹
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
@@ -33,16 +33,16 @@ public class DialogueManager : MonoBehaviour
 
     private void Update()
     {
-        // По клику мыши или пробелу переключаем реплики
-        if (IsDialogueActive && (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)))
+        // РџРѕ РєР»РёРєСѓ РјС‹С€Рё РёР»Рё РїСЂРѕР±РµР»Сѓ РїРµСЂРµРєР»СЋС‡Р°РµРј СЂРµРїР»РёРєРё
+        if (IsDialogueActive && (BotInput.GetMouseButtonDown(0) || BotInput.GetKeyDown(KeyCode.Space)))
         {
             if (isTyping)
             {
-                cancelTyping = true; // Если текст печатается, ускоряем его
+                cancelTyping = true; // Р•СЃР»Рё С‚РµРєСЃС‚ РїРµС‡Р°С‚Р°РµС‚СЃСЏ, СѓСЃРєРѕСЂСЏРµРј РµРіРѕ
             }
             else
             {
-                DisplayNextLine(); // Если текст допечатан, показываем следующий
+                DisplayNextLine(); // Р•СЃР»Рё С‚РµРєСЃС‚ РґРѕРїРµС‡Р°С‚Р°РЅ, РїРѕРєР°Р·С‹РІР°РµРј СЃР»РµРґСѓСЋС‰РёР№
             }
         }
     }
@@ -74,10 +74,10 @@ public class DialogueManager : MonoBehaviour
         DialogueLine currentLine = dialogueQueue.Dequeue();
         speakerNameText.text = currentLine.speakerName;
 
-        // --- ИЗМЕНЕННЫЙ БЛОК СО ЗВУКОМ ---
+        // --- РР—РњР•РќР•РќРќР«Р™ Р‘Р›РћРљ РЎРћ Р—Р’РЈРљРћРњ ---
         if (currentLine.voiceClip != null)
         {
-            // Если в этой реплике ЕСТЬ звук, мы останавливаем старый и включаем новый
+            // Р•СЃР»Рё РІ СЌС‚РѕР№ СЂРµРїР»РёРєРµ Р•РЎРўР¬ Р·РІСѓРє, РјС‹ РѕСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃС‚Р°СЂС‹Р№ Рё РІРєР»СЋС‡Р°РµРј РЅРѕРІС‹Р№
             if (voiceSource != null)
             {
                 voiceSource.Stop();
@@ -85,7 +85,7 @@ public class DialogueManager : MonoBehaviour
                 voiceSource.Play();
             }
         }
-        // Если файл None, мы НИЧЕГО НЕ ДЕЛАЕМ. Звук с прошлой реплики продолжит играть.
+        // Р•СЃР»Рё С„Р°Р№Р» None, РјС‹ РќРР§Р•Р“Рћ РќР• Р”Р•Р›РђР•Рњ. Р—РІСѓРє СЃ РїСЂРѕС€Р»РѕР№ СЂРµРїР»РёРєРё РїСЂРѕРґРѕР»Р¶РёС‚ РёРіСЂР°С‚СЊ.
         // ---------------------------------
 
         StopAllCoroutines();
@@ -102,7 +102,7 @@ public class DialogueManager : MonoBehaviour
         {
             if (cancelTyping)
             {
-                dialogueText.text = line.text; // Мгновенно показываем весь текст
+                dialogueText.text = line.text; // РњРіРЅРѕРІРµРЅРЅРѕ РїРѕРєР°Р·С‹РІР°РµРј РІРµСЃСЊ С‚РµРєСЃС‚
                 break;
             }
 
@@ -110,7 +110,7 @@ public class DialogueManager : MonoBehaviour
             yield return new WaitForSeconds(typingSpeed);
         }
 
-        // Ждем, пока проиграет аудио, прежде чем разрешить клик дальше
+        // Р–РґРµРј, РїРѕРєР° РїСЂРѕРёРіСЂР°РµС‚ Р°СѓРґРёРѕ, РїСЂРµР¶РґРµ С‡РµРј СЂР°Р·СЂРµС€РёС‚СЊ РєР»РёРє РґР°Р»СЊС€Рµ
         isTyping = false;
     }
 

@@ -17,6 +17,16 @@ public class StudioSplash : MonoBehaviour
     public Color titleColor = new Color(0.9f, 0.87f, 0.82f);
     public Color accentColor = new Color(0.72f, 0.04f, 0.03f);
 
+    // Какой финал игрок видел в прошлый раз: 0 - ещё ни одного, 1 - Спасение, 2 - Чужая, 3 - Петля
+    public const string LastEndingKey = "Kontora.LastEnding";
+    private int lastEnding;
+    private RawImage faceFlash;
+    private Camera revealCam;
+    private RenderTexture revealTexture;
+    private GameObject revealBody, revealRig;
+    private Transform revealHead;
+    private float twitch, twitchTarget, twitchUntil, nextTwitch;
+
     [Header("Предупреждение 18+")]
     public bool showDisclaimer = true;
     public Font headerFont;
@@ -146,6 +156,9 @@ public class StudioSplash : MonoBehaviour
         line.rectTransform.sizeDelta = new Vector2(0f, 3f);
 
         // Темнота, нарастает синтезатор
+        lastEnding = PlayerPrefs.GetInt(LastEndingKey, 0);
+        bool haunted = lastEnding >= 2;   // игрок уже видел плохой финал: заставка это помнит
+        string subtitleText = lastEnding == 3 ? "ТЫ ВЕРНУЛСЯ" : lastEnding == 2 ? "ОНА ВСЁ ЕЩЁ С ТОБОЙ" : subtitle;
         audioSource.Play();
         yield return Wait(1.0f);
 
@@ -171,18 +184,18 @@ public class StudioSplash : MonoBehaviour
             float e = 1f - Mathf.Pow(1f - Mathf.Clamp01(t), 3f);
             line.rectTransform.sizeDelta = new Vector2(600f * e, 3f);
             line.color = WithAlpha(accentColor, e);
-            int letters = Mathf.FloorToInt(Mathf.Clamp01(t * 1.25f - 0.15f) * subtitle.Length);
+            int letters = Mathf.FloorToInt(Mathf.Clamp01(t * 1.25f - 0.15f) * subtitleText.Length);
             if (letters > typed)
             {
                 typed = letters;
                 audioSource.PlayOneShot(typeClick, 0.55f);
             }
-            sub.text = Spaced(subtitle.Substring(0, typed));
+            sub.text = Spaced(subtitleText.Substring(0, typed));
             yield return null;
         }
         line.rectTransform.sizeDelta = new Vector2(600f, 3f);
         line.color = accentColor;
-        sub.text = Spaced(subtitle);
+        sub.text = Spaced(subtitleText);
 
         // Держим надпись: медленное приближение и редкие глитчи
         float hold = 2.4f, h = 0f, nextGlitch = 0.6f;
@@ -193,18 +206,21 @@ public class StudioSplash : MonoBehaviour
             logo.localScale = Vector3.one * (1f + 0.03f * h / hold);
             if (h >= nextGlitch)
             {
-                nextGlitch = h + Random.Range(0.5f, 1.1f);
+                nextGlitch = h + (haunted ? Random.Range(0.2f, 0.5f) : Random.Range(0.5f, 1.1f));
                 burst = StartCoroutine(GlitchBurst());
             }
             yield return null;
         }
         if (burst != null) StopCoroutine(burst);
 
-        // Последний сбой и затухание
-        Glitch(12f);
-        yield return new WaitForSecondsRealtime(0.06f);
-        Glitch(0f);
-        yield return Fade(1f, 0f, skip ? 0.25f : 0.9f, SetLogoAlpha);
+        if (skip)
+        {
+            yield return Fade(1f, 0f, 0.25f, SetLogoAlpha);
+        }
+        else
+        {
+            yield return LogoBreaks(haunted);
+        }
         yield return new WaitForSecondsRealtime(skip ? 0.05f : 0.4f);
 
         // 3. Проявляем меню
@@ -213,6 +229,135 @@ public class StudioSplash : MonoBehaviour
         yield return Fade(1f, 0f, 0.8f, a => blackout.color = new Color(0f, 0f, 0f, a));
         while (audioSource.isPlaying) yield return null;
         Destroy(gameObject);
+    }
+
+    // Надпись разваливается, звук проседает, и на долю секунды из темноты смотрит лицо
+    IEnumerator LogoBreaks(bool haunted)
+    {
+        const string junk = "#%/\\|?!_";
+        float time = haunted ? 1.1f : 0.75f;
+        char[] letters = studioName.ToCharArray();
+        for (float t = 0f; t < time && !skip; t += Time.unscaledDeltaTime)
+        {
+            float k = t / time;
+            audioSource.pitch = Mathf.Lerp(1f, 0.3f, k * k);
+            Glitch(Mathf.Lerp(6f, 34f, k));
+            SetTitleAlpha(Random.value < k * 0.55f ? 0.08f : 1f);
+            for (int i = 0; i < letters.Length; i++)
+                letters[i] = letters[i] != ' ' && Random.value < k * k * 0.7f ? junk[Random.Range(0, junk.Length)] : studioName[i];
+            title.text = titleRed.text = titleCyan.text = new string(letters);
+            yield return null;
+        }
+        title.text = titleRed.text = titleCyan.text = studioName;
+        Glitch(0f);
+        SetLogoAlpha(0f);
+
+        if (skip) { audioSource.pitch = 1f; yield break; }
+        // Гул почти стих. Из темноты быстро проступает живая голова, потом резкий обрыв
+        audioSource.volume = volume * 0.3f;
+        BuildReveal();
+        yield return Wait(haunted ? 0.35f : 0.2f);   // камера успевает отрисовать первые кадры в темноте
+        if (!skip && revealCam != null)
+        {
+            float appear = haunted ? 1.5f : 1f;
+            Vector3 far = revealCam.transform.position;
+            Vector3 near = far + revealCam.transform.forward * 0.13f;
+            faceFlash.color = new Color(1f, 1f, 1f, 0f);
+            faceFlash.gameObject.SetActive(true);
+            for (float t = 0f; t < appear && !skip; t += Time.unscaledDeltaTime)
+            {
+                float k = t / appear;
+                faceFlash.color = new Color(1f, 1f, 1f, k * k);
+                revealCam.transform.position = Vector3.Lerp(far, near, k);
+                audioSource.volume = volume * Mathf.Lerp(0.3f, 0.75f, k);
+                yield return null;
+            }
+            yield return Wait(0.15f);
+            faceFlash.gameObject.SetActive(false);
+            if (!skip) audioSource.PlayOneShot(typeClick, 1f);
+        }
+        ClearReveal();
+        audioSource.pitch = 1f;
+        audioSource.volume = volume;
+    }
+
+    // Голова бабки рисуется вживую вдали от сцены и выводится на экран
+    void BuildReveal()
+    {
+        var hm = FindAnyObjectByType<HallucinationManager>(FindObjectsInactive.Include);
+        if (hm == null || hm.realGhost == null) return;
+
+        revealBody = GrannyJumpscare.MakeCopy(hm.realGhost);
+        revealBody.transform.SetPositionAndRotation(new Vector3(0f, -300f, 0f), Quaternion.identity);
+        revealBody.SetActive(true);
+        var anim = revealBody.GetComponent<Animator>();
+        anim.Play("скример", 0, 0.1f);
+        anim.speed = 0.3f;   // еле заметно тянется вперёд
+        anim.Update(0f);
+        revealHead = anim.GetBoneTransform(HumanBodyBones.Head);
+
+        revealRig = new GameObject("Splash Reveal Rig");
+        revealRig.transform.position = revealHead.position;
+        revealCam = new GameObject("Reveal Camera").AddComponent<Camera>();
+        revealCam.transform.SetParent(revealRig.transform, false);
+        revealCam.transform.SetPositionAndRotation(revealHead.position + Vector3.forward * 0.55f + Vector3.up * 0.1f, Quaternion.LookRotation(Vector3.back));
+        var hd = revealCam.gameObject.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
+        hd.clearColorMode = UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData.ClearColorMode.Color;
+        hd.backgroundColorHDR = Color.black;
+        hd.volumeLayerMask = 0;
+        revealCam.fieldOfView = 42f;
+        revealCam.nearClipPlane = 0.03f;
+        revealCam.farClipPlane = 6f;
+        revealTexture = new RenderTexture(1280, 720, 24);
+        revealCam.targetTexture = revealTexture;
+        faceFlash.texture = revealTexture;
+
+        AddRevealLight(new Vector3(0.08f, -0.35f, 0.35f), 3f, new Color(0.68f, 0.85f, 0.75f));
+        AddRevealLight(new Vector3(-0.35f, 0.05f, 0.2f), 0.8f, new Color(0.7f, 0.15f, 0.12f));
+    }
+
+    void AddRevealLight(Vector3 offset, float lumens, Color color)
+    {
+        var go = new GameObject("Reveal Light");
+        go.transform.SetParent(revealRig.transform, false);
+        go.transform.localPosition = offset;
+        var l = go.AddComponent<Light>();
+        go.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalLightData>();
+        l.type = LightType.Point;
+        l.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
+        l.intensity = lumens;
+        l.range = 3f;
+        l.color = color;
+        l.shadows = LightShadows.None;
+    }
+
+    void ClearReveal()
+    {
+        if (revealBody != null) Destroy(revealBody);
+        if (revealRig != null) Destroy(revealRig);
+        if (revealTexture != null) revealTexture.Release();
+        revealHead = null;
+    }
+
+    void OnDestroy() => ClearReveal();
+
+    // Кости после Animator: голова смотрит в камеру, наклонена и дёргается
+    void LateUpdate()
+    {
+        if (revealHead == null || revealCam == null) return;
+        float now = Time.unscaledTime;
+        if (now >= nextTwitch)
+        {
+            nextTwitch = now + Random.Range(0.3f, 0.7f);
+            twitchUntil = now + 0.1f;
+            twitchTarget = Random.value < 0.5f ? -32f : 32f;
+        }
+        twitch = Mathf.MoveTowards(twitch, now < twitchUntil ? twitchTarget : 0f, 700f * Time.unscaledDeltaTime);
+
+        Vector3 toCam = (revealCam.transform.position - revealHead.position).normalized;
+        Quaternion look = Quaternion.FromToRotation(revealHead.forward, toCam);
+        float roll = 10f + Mathf.Sin(now * 2.6f) * 7f + twitch;
+        revealHead.rotation = Quaternion.AngleAxis(roll, toCam) * look * revealHead.rotation;
     }
 
     IEnumerator FadeOutSting(float time)
@@ -265,8 +410,8 @@ public class StudioSplash : MonoBehaviour
     void SetTitleAlpha(float a)
     {
         title.color = WithAlpha(titleColor, a);
-        titleRed.color = new Color(1f, 0.05f, 0.05f, 0.55f * a);
-        titleCyan.color = new Color(0.1f, 0.9f, 1f, 0.45f * a);
+        titleRed.color = new Color(0.45f, 0.03f, 0.02f, 0.75f * a);   // засохшая кровь, а не неон
+        titleCyan.color = new Color(0.25f, 0.4f, 0.3f, 0.55f * a);    // больничный зелёный, как лампы в коридорах
     }
 
     void SetLogoAlpha(float a)
@@ -274,6 +419,24 @@ public class StudioSplash : MonoBehaviour
         SetTitleAlpha(a);
         sub.color = WithAlpha(accentColor, a);
         line.color = WithAlpha(accentColor, a);
+    }
+
+    // Тёмное скругление: видно только овал с лицом
+    static Texture2D MakeFaceMask()
+    {
+        const int size = 256;
+        var px = new Color[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + 0.5f) / size - 0.5f, dy = (y + 0.5f) / size - 0.55f;
+                float d = Mathf.Sqrt(dx * dx * 2.2f + dy * dy * 1.1f);
+                px[y * size + x] = new Color(0f, 0f, 0f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.16f, 0.46f, d)));
+            }
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        tex.SetPixels(px);
+        tex.Apply();
+        return tex;
     }
 
     static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
@@ -338,6 +501,13 @@ public class StudioSplash : MonoBehaviour
         sub = NewText("Studio", logo, f2, 52, "", TextAnchor.MiddleCenter, new Vector2(1600, 80));
         sub.rectTransform.anchoredPosition = new Vector2(0f, -122f);
         logo.gameObject.SetActive(false);
+
+        faceFlash = NewGraphic<RawImage>("Face Flash", parent);
+        Stretch(faceFlash.rectTransform);
+        var mask = NewGraphic<RawImage>("Face Dark Edge", faceFlash.transform);
+        Stretch(mask.rectTransform);
+        mask.texture = MakeFaceMask();
+        faceFlash.gameObject.SetActive(false);
     }
 
     void BuildDisclaimer(Transform parent)

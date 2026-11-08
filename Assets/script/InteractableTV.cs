@@ -48,6 +48,7 @@ public class InteractableTV : MonoBehaviour
     private bool[] seen;
     private int current;
     private float watchTime;
+    private float switchLockUntil, exitLockUntil;   // чтобы пугалку нельзя было пролистать, не увидев
     private float noiseUntil;
     private float nextGlitch;
     private float jitterUntil;
@@ -93,6 +94,7 @@ public class InteractableTV : MonoBehaviour
 
     public void Interact()
     {
+        if (IsViewing && Time.unscaledTime < exitLockUntil) return;   // пугалку нельзя пропустить выходом
         if (Time.frameCount == lastToggleFrame) return;
         lastToggleFrame = Time.frameCount;
 
@@ -161,9 +163,17 @@ public class InteractableTV : MonoBehaviour
 
         // Двойник: появляется в выбранной камере при первом показе, при уходе с неё исчезает навсегда
         if (doppel != null && doppel.activeSelf) { doppel.SetActive(false); doppelDone = true; }
-        if (!doppelDone && current == doppelCamera && ShowDoppel(cam)) return;   // в этой камере больше ничего не нужно
+        switchLockUntil = noiseUntil + 0.5f;
+        if (!doppelDone && current == doppelCamera && ShowDoppel(cam))
+        {
+            switchLockUntil = exitLockUntil = noiseUntil + 2f;
+            return;   // в этой камере больше ничего не нужно
+        }
         if (apparitionsShown < maxApparitions && (hauntCount[current] > 0 || UnityEngine.Random.value < apparitionChance))
-            apparitionAfter = UnityEngine.Random.Range(1.5f, 3.5f);
+        {
+            apparitionAfter = UnityEngine.Random.Range(0.3f, 1f);
+            switchLockUntil = exitLockUntil = noiseUntil + apparitionAfter + 1.2f;
+        }
     }
 
     void UpdateApparition(float t)
@@ -299,6 +309,13 @@ public class InteractableTV : MonoBehaviour
         foreach (var l in hideWhileViewing) if (l != null) l.enabled = on;
     }
 
+    public bool TryExit()
+    {
+        if (!IsViewing) return false;
+        Interact();
+        return !IsViewing;
+    }
+
     void ScheduleGlitch() => nextGlitch = Time.unscaledTime + UnityEngine.Random.Range(glitchInterval.x, glitchInterval.y);
 
     void Update()
@@ -309,9 +326,12 @@ public class InteractableTV : MonoBehaviour
         overlay.enabled = !PauseMenu.GameIsPaused;
         if (PauseMenu.GameIsPaused) return;
 
-        if (Input.GetKeyDown(KeyCode.E)) { Interact(); return; }
-        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) ShowCamera(current + 1);
-        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) ShowCamera(current - 1);
+        if (BotInput.GetKeyDown(KeyCode.E) && TryExit()) return;
+        if (Time.unscaledTime >= switchLockUntil)
+        {
+            if (BotInput.GetKeyDown(KeyCode.D) || BotInput.GetKeyDown(KeyCode.RightArrow)) ShowCamera(current + 1);
+            if (BotInput.GetKeyDown(KeyCode.A) || BotInput.GetKeyDown(KeyCode.LeftArrow)) ShowCamera(current - 1);
+        }
 
         float t = Time.unscaledTime;
 
@@ -435,7 +455,7 @@ public class InteractableTV : MonoBehaviour
         noSignalText.text = "НЕТ СИГНАЛА";
 
         var hint = NewText("Hint", feedRect, f, 24, TextAnchor.LowerRight, new Vector2(1, 0), new Vector2(-48, 40));
-        hint.text = "A / D — листать камеры      E — выключить";
+        hint.text = "A / D — листать камеры      E / Esc — выключить";
         hint.color = new Color(1f, 1f, 1f, 0.6f);
 
         hiss = canvasGo.AddComponent<AudioSource>();

@@ -5,28 +5,28 @@ using UnityEngine.AI;
 
 public class Pentagram : MonoBehaviour
 {
-    [Header("Настройки")]
+    [Header("РќР°СЃС‚СЂРѕР№РєРё")]
     public ItemData stoneItem;
     public GameObject[] stonesOnAltar;
     public int totalCandles = 5;
 
-    [Header("Эффекты изгнания")]
+    [Header("Р­С„С„РµРєС‚С‹ РёР·РіРЅР°РЅРёСЏ")]
     public AudioClip exorcismSound;
     public Light flashLight;
     public Color burnColor = new Color(1f, 0.4f, 0f);
 
-    [Header("Скрытие UI и рук")]
+    [Header("РЎРєСЂС‹С‚РёРµ UI Рё СЂСѓРє")]
     public GameObject hudToHide;
     public GameObject handsToHide;
 
-    [Header("Катсцена")]
+    [Header("РљР°С‚СЃС†РµРЅР°")]
     public GameObject cutsceneCamera;
     public float timeBeforeBurn = 2f;
 
-    [Header("Бабки")]
+    [Header("Р‘Р°Р±РєРё")]
     public GameObject ritualGhost;
 
-    [Header("Кукла (кладётся в центр последней, завершает ритуал)")]
+    [Header("РљСѓРєР»Р° (РєР»Р°РґС‘С‚СЃСЏ РІ С†РµРЅС‚СЂ РїРѕСЃР»РµРґРЅРµР№, Р·Р°РІРµСЂС€Р°РµС‚ СЂРёС‚СѓР°Р»)")]
     public ItemData dollItem;
     public GameObject dollOnAltar;
 
@@ -45,6 +45,30 @@ public class Pentagram : MonoBehaviour
         if (dollOnAltar != null) dollOnAltar.SetActive(false);
     }
 
+    private static AudioClip stoneSound;
+
+    // Р“Р»СѓС…РѕР№ СѓРґР°СЂ РєР°РјРЅСЏ Рѕ РєР°РјРµРЅСЊ: РєРѕСЂРѕС‚РєРёР№ С‰РµР»С‡РѕРє Рё РЅРёР·РєРёР№ Р·Р°С‚СѓС…Р°СЋС‰РёР№ С‚РѕРЅ
+    public static AudioClip StoneSound()
+    {
+        if (stoneSound != null) return stoneSound;
+        const int rate = 44100;
+        int n = (int)(rate * 0.45f);
+        var d = new float[n];
+        var rnd = new System.Random(7);
+        float ph = 0f, lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            ph += Mathf.Lerp(190f, 85f, Mathf.Clamp01(t * 6f)) / rate;
+            float white = (float)rnd.NextDouble() * 2f - 1f;
+            lp += (white - lp) * 0.35f;
+            d[i] = Mathf.Sin(ph * 2f * Mathf.PI) * Mathf.Exp(-t * 14f) * 0.75f + lp * Mathf.Exp(-t * 70f) * 0.9f;
+        }
+        stoneSound = AudioClip.Create("Stone Place", n, 1, rate, false);
+        stoneSound.SetData(d, 0);
+        return stoneSound;
+    }
+
     public bool PlaceStone(Inventory playerInventory)
     {
         if (ritualDone || stonesPlaced >= stonesOnAltar.Length) return false;
@@ -57,6 +81,7 @@ public class Pentagram : MonoBehaviour
                 stonesOnAltar[stonesPlaced].SetActive(true);
 
             stonesPlaced++;
+            AudioSource.PlayClipAtPoint(StoneSound(), transform.position, 1f);
             CheckRitualConditions();
 
             return true;
@@ -64,15 +89,15 @@ public class Pentagram : MonoBehaviour
         return false;
     }
 
-    // Подсказка по E на пентаграмме: камни -> свечи -> кукла
+    // РџРѕРґСЃРєР°Р·РєР° РїРѕ E РЅР° РїРµРЅС‚Р°РіСЂР°РјРјРµ: РєР°РјРЅРё -> СЃРІРµС‡Рё -> РєСѓРєР»Р°
     public string GetPrompt(Inventory inv)
     {
-        if (ritualDone) return "Ритуал завершён";
+        if (ritualDone) return "Р РёС‚СѓР°Р» Р·Р°РІРµСЂС€С‘РЅ";
         if (stonesPlaced < stonesOnAltar.Length)
-            return inv != null && inv.Has(stoneItem) ? "Нажмите E, чтобы положить камень" : "Нужны камни для ритуала";
-        if (candlesLit < totalCandles) return "Сначала зажгите все свечи";
+            return inv != null && inv.Has(stoneItem) ? "РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РїРѕР»РѕР¶РёС‚СЊ РєР°РјРµРЅСЊ" : "РќСѓР¶РЅС‹ РєР°РјРЅРё РґР»СЏ СЂРёС‚СѓР°Р»Р°";
+        if (candlesLit < totalCandles) return "РЎРЅР°С‡Р°Р»Р° Р·Р°Р¶РіРёС‚Рµ РІСЃРµ СЃРІРµС‡Рё";
         if (NeedsDoll && !dollPlaced)
-            return inv != null && inv.Has(dollItem) ? "Нажмите E, чтобы положить куклу в центр" : "В центр пентаграммы нужно положить куклу";
+            return inv != null && inv.Has(dollItem) ? "РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РїРѕР»РѕР¶РёС‚СЊ РєСѓРєР»Сѓ РІ С†РµРЅС‚СЂ" : "Р’ С†РµРЅС‚СЂ РїРµРЅС‚Р°РіСЂР°РјРјС‹ РЅСѓР¶РЅРѕ РїРѕР»РѕР¶РёС‚СЊ РєСѓРєР»Сѓ";
         return "";
     }
 
@@ -102,9 +127,9 @@ public class Pentagram : MonoBehaviour
 
     void CheckRitualConditions()
     {
-        Debug.Log($"Камни: {stonesPlaced}/{stonesOnAltar.Length} | Свечи: {candlesLit}/{totalCandles}");
+        Debug.Log($"РљР°РјРЅРё: {stonesPlaced}/{stonesOnAltar.Length} | РЎРІРµС‡Рё: {candlesLit}/{totalCandles}");
 
-        // Если разложены все камни И зажжены все свечи
+        // Р•СЃР»Рё СЂР°Р·Р»РѕР¶РµРЅС‹ РІСЃРµ РєР°РјРЅРё Р Р·Р°Р¶Р¶РµРЅС‹ РІСЃРµ СЃРІРµС‡Рё
         if (stonesPlaced >= stonesOnAltar.Length && candlesLit >= totalCandles && (!NeedsDoll || dollPlaced) && !ritualDone)
         {
             StartCoroutine(ActivateRitual());
@@ -115,7 +140,7 @@ public class Pentagram : MonoBehaviour
     {
         ritualDone = true;
 
-        // Новая концовка: бабку затягивает в пентаграмму, из дыма выходит Анджела, экран "Игра пройдена"
+        // РќРѕРІР°СЏ РєРѕРЅС†РѕРІРєР°: Р±Р°Р±РєСѓ Р·Р°С‚СЏРіРёРІР°РµС‚ РІ РїРµРЅС‚Р°РіСЂР°РјРјСѓ, РёР· РґС‹РјР° РІС‹С…РѕРґРёС‚ РђРЅРґР¶РµР»Р°, СЌРєСЂР°РЅ "РРіСЂР° РїСЂРѕР№РґРµРЅР°"
         var ending = FindAnyObjectByType<RitualEnding>();
         if (ending != null)
         {

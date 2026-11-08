@@ -15,6 +15,19 @@ public class GhostChase : MonoBehaviour
     public float viewAngle = 60f;
     public LayerMask obstacleMask;
 
+    [Header("Рост по камням: со 2-го камня к 5-му значения доходят до этих")]
+    public float maxWalkSpeed = 2.4f;
+    public float maxChaseSpeed = 5.2f;    // игрок бежит 7: от неё можно оторваться
+    public float maxViewDistance = 20f;
+    public float maxViewAngle = 150f;
+    [Tooltip("Если игрока уже ловили дважды, погоня не быстрее этого: игра остаётся проходимой")]
+    public float mercyChaseSpeed = 4.6f;
+
+    private float baseWalk, baseChase, baseView, baseAngle;
+    private int appliedStones = -1, appliedLost = -1;
+    private bool crawling, crawlDelay;
+    private GrannySlow slow;
+
     private NavMeshAgent agent;
     private Animator anim;
     private Transform player;
@@ -35,7 +48,7 @@ public class GhostChase : MonoBehaviour
     // и через несколько секунд уходит, так и не тронув его. Если игрок вылезет раньше - обычная погоня.
     public bool TryPeekCloset(Vector3 stand, Vector3 faceDir, float hold)
     {
-        if (Scripted || agent == null || !agent.enabled || !agent.isOnNavMesh) return false;
+        if (crawling || Scripted || agent == null || !agent.enabled || !agent.isOnNavMesh) return false;   // на четвереньках к решётке не встать
         if (!NavMesh.SamplePosition(stand, out NavMeshHit hit, 1.2f, NavMesh.AllAreas)) return false;
         var path = new NavMeshPath();
         if (!agent.CalculatePath(hit.position, path) || path.status != NavMeshPathStatus.PathComplete) return false;
@@ -137,6 +150,8 @@ public class GhostChase : MonoBehaviour
     {
         agent = GetComponent<NavMeshAgent>();
         anim = GetComponent<Animator>();
+        slow = GetComponent<GrannySlow>();
+        baseWalk = walkSpeed; baseChase = chaseSpeed; baseView = viewDistance; baseAngle = viewAngle;
 
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null) player = playerObj.transform;
@@ -148,6 +163,9 @@ public class GhostChase : MonoBehaviour
     void Update()
     {
         if (player == null || agent == null || !agent.enabled) return;
+
+        ApplyStoneStage();
+        KeepCrawling();
 
         // --- ПЕРЕДАЧА СКОРОСТИ В ANIMATOR ---
         if (anim != null)
@@ -220,7 +238,8 @@ public class GhostChase : MonoBehaviour
     // а если застряла несколько раз подряд - переставляем её чуть вперёд по пути.
     void WatchStuck()
     {
-        if (agent.pathPending || agent.isStopped || agent.speed < 0.3f || agent.remainingDistance < 1f)
+        // pathPending не проверяем: при погоне путь задаётся каждый кадр, и таймер застревания всё время сбрасывался
+        if (agent.isStopped || agent.speed < 0.3f || agent.remainingDistance < 1f)
         {
             stuckTimer = 0f; stuckCheckPos = transform.position; stuckCount = 0;
             return;
@@ -294,6 +313,49 @@ public class GhostChase : MonoBehaviour
             return hit.collider.CompareTag("Player");
         }
         return true;
+    }
+
+    // С каждым камнем быстрее и зорче, с последним встаёт на четвереньки
+    void ApplyStoneStage()
+    {
+        int stones = PickupItem.stonesCollected, lost = Sanity.Lost;
+        if (stones == appliedStones && lost == appliedLost) return;
+        appliedStones = stones;
+        appliedLost = lost;
+
+        float k = Mathf.Clamp01((stones - 2) / 3f);
+        walkSpeed = Mathf.Lerp(baseWalk, maxWalkSpeed, k);
+        chaseSpeed = Mathf.Lerp(baseChase, maxChaseSpeed, k);
+        if (lost >= 2) chaseSpeed = Mathf.Min(chaseSpeed, mercyChaseSpeed);
+        viewDistance = Mathf.Lerp(baseView, maxViewDistance, k);
+        viewAngle = Mathf.Lerp(baseAngle, maxViewAngle, k);
+
+        if (k >= 1f && !crawling)
+        {
+            crawling = true;
+            OutdoorSound.HushFor(4.5f);
+            StartCoroutine(BeginSurfaceCrawl());
+        }
+    }
+
+    System.Collections.IEnumerator BeginSurfaceCrawl()
+    {
+        crawlDelay = true;
+        yield return new WaitForSeconds(3f);   // тишина перед превращением
+        crawlDelay = false;
+        gameObject.AddComponent<GrannySurfaceCrawl>();
+        // Вопль слышен издалека и с её стороны: игрок понимает, что она изменилась
+        var hm = FindAnyObjectByType<HallucinationManager>(FindObjectsInactive.Include);
+        Vector3 toGhost = transform.position - player.position;
+        if (hm != null && hm.screamSound != null)
+            AudioSource.PlayClipAtPoint(hm.screamSound, player.position + Vector3.ClampMagnitude(toGhost, 8f), 0.9f);
+    }
+
+    void KeepCrawling()
+    {
+        if (!crawling || crawlDelay || anim == null) return;
+        if (!anim.GetCurrentAnimatorStateInfo(0).IsName("crawl") && !anim.IsInTransition(0)) anim.CrossFade("crawl", 0.25f);
+        if (slow != null) slow.animRate = Mathf.Clamp(agent.velocity.magnitude / 1.5f, 0f, 2.4f);   // руки и ноги в такт скорости
     }
 
     void GoToNextWaypoint()

@@ -71,7 +71,7 @@ public class EvacuationPlan : MonoBehaviour
     void Update()
     {
         if (current != this || !IsOpen) return;
-        if (Time.frameCount != openedFrame && Input.GetKeyDown(KeyCode.E)) Close();
+        if (Time.frameCount != openedFrame && BotInput.GetKeyDown(KeyCode.E)) Close();
     }
 
     void Close()
@@ -81,6 +81,13 @@ public class EvacuationPlan : MonoBehaviour
         closedFrame = Time.frameCount;
         if (view != null) view.SetActive(false);
         if (player != null) player.enabled = true;
+    }
+
+    public static bool CloseOpen()
+    {
+        if (!IsOpen || current == null) return false;
+        current.Close();
+        return true;
     }
 
     void OnDisable()
@@ -166,7 +173,7 @@ public class EvacuationPlan : MonoBehaviour
         legend.fontSize = 24;
         legend.alignment = TextAnchor.MiddleLeft;
         legend.color = new Color(0.2f, 0.2f, 0.2f);
-        legend.text = "<color=#2e9a3c>■</color> лестницы и выходы        <color=#d10e08>●</color> вы здесь        E — закрыть";
+        legend.text = "<color=#2e9a3c>■</color> лестницы и выходы        <color=#d10e08>●</color> вы здесь        E / Esc — закрыть";
 
         view.SetActive(false);
     }

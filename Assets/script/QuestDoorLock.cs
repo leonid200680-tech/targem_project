@@ -37,7 +37,7 @@ public class QuestDoorLock : MonoBehaviour
         }
 
         // Звук дёрганья ручки, если игрок пытается открыть запертую дверь
-        if (lockedSound != null && Input.GetKeyDown(KeyCode.E) && IsLookedAt())
+        if (lockedSound != null && BotInput.GetKeyDown(KeyCode.E) && IsLookedAt())
             AudioSource.PlayClipAtPoint(lockedSound, transform.position);
     }
 

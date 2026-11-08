@@ -17,6 +17,8 @@ public class GrannyJumpscare : MonoBehaviour
         go.AddComponent<GrannyJumpscare>().StartCoroutine(go.GetComponent<GrannyJumpscare>().Run(source, scream, cam, duration));
     }
 
+    void OnDestroy() => IsPlaying = false;   // выход в меню посреди скримера
+
     IEnumerator Run(GameObject source, AudioClip scream, Camera cam, float duration)
     {
         IsPlaying = true;
@@ -28,7 +30,7 @@ public class GrannyJumpscare : MonoBehaviour
         var anim = granny.GetComponent<Animator>();
         Transform head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
         granny.SetActive(true);
-        if (anim != null) { anim.Play("скример", 0, 0.15f); anim.Update(0f); }
+        if (anim != null) { anim.speed = 1f; anim.Play("скример", 0, 0.15f); anim.Update(0f); }
         float headHeight = head != null ? head.position.y - granny.transform.position.y : 1.55f;
 
         // Свет снизу-сбоку на лицо: сквозь темноту видно морщины и глаза
@@ -129,7 +131,7 @@ public class GrannyJumpscare : MonoBehaviour
     }
 
     // Копия бабки без поведения: только модель и анимация
-    static GameObject MakeCopy(GameObject src)
+    public static GameObject MakeCopy(GameObject src)
     {
         var holder = new GameObject("tmp");
         holder.SetActive(false);   // копия создаётся выключенной, её скрипты не успеют запуститься
@@ -138,8 +140,9 @@ public class GrannyJumpscare : MonoBehaviour
         foreach (var b in go.GetComponentsInChildren<MonoBehaviour>(true)) DestroyImmediate(b);
         foreach (var a in go.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true)) DestroyImmediate(a);
         foreach (var c in go.GetComponentsInChildren<Collider>(true)) DestroyImmediate(c);
+        foreach (var f in go.GetComponentsInChildren<AudioLowPassFilter>(true)) DestroyImmediate(f);   // зависит от AudioSource, убираем первым
         foreach (var s in go.GetComponentsInChildren<AudioSource>(true)) DestroyImmediate(s);
-        foreach (var r in go.GetComponentsInChildren<SkinnedMeshRenderer>(true)) r.updateWhenOffscreen = true;
+        foreach (var r in go.GetComponentsInChildren<SkinnedMeshRenderer>(true)) { r.updateWhenOffscreen = true; r.enabled = true; }   // на последнем этапе у источника модель скрыта
         go.transform.SetParent(null, false);
         go.SetActive(false);
         Destroy(holder);

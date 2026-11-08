@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 public class PlayerInteraction : MonoBehaviour
 {
-    [Header("Настройки")]
+    [Header("РќР°СЃС‚СЂРѕР№РєРё")]
     public float interactDistance = 3f;
     public Text interactionText;
 
@@ -12,7 +12,7 @@ public class PlayerInteraction : MonoBehaviour
 
     void Start()
     {
-        // Ищем камеру внутри игрока
+        // РС‰РµРј РєР°РјРµСЂСѓ РІРЅСѓС‚СЂРё РёРіСЂРѕРєР°
         cam = GetComponentInChildren<Camera>();
         playerInventory = GetComponent<Inventory>();
 
@@ -24,7 +24,7 @@ public class PlayerInteraction : MonoBehaviour
     {
         if (cam == null) return;
 
-        // Если идет диалог, игрок не может взаимодействовать с миром
+        // Р•СЃР»Рё РёРґРµС‚ РґРёР°Р»РѕРі, РёРіСЂРѕРє РЅРµ РјРѕР¶РµС‚ РІР·Р°РёРјРѕРґРµР№СЃС‚РІРѕРІР°С‚СЊ СЃ РјРёСЂРѕРј
         if (DialogueManager.IsDialogueActive)
         {
             HideText();
@@ -37,110 +37,110 @@ public class PlayerInteraction : MonoBehaviour
             return;
         }
 
-        // Луч из центра экрана
+        // Р›СѓС‡ РёР· С†РµРЅС‚СЂР° СЌРєСЂР°РЅР°
         Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            // 1. Проверка на ДВЕРЬ
-            // 0. Шкаф-укрытие: и дверцы, и корпус ведут в шкаф
+            // 1. РџСЂРѕРІРµСЂРєР° РЅР° Р”Р’Р•Р Р¬
+            // 0. РЁРєР°С„-СѓРєСЂС‹С‚РёРµ: Рё РґРІРµСЂС†С‹, Рё РєРѕСЂРїСѓСЃ РІРµРґСѓС‚ РІ С€РєР°С„
             HideableCloset closetHit = hit.collider.GetComponentInParent<HideableCloset>();
             if (closetHit != null)
             {
                 ShowText(closetHit.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) closetHit.Interact();
+                if (BotInput.GetKeyDown(KeyCode.E)) closetHit.Interact();
                 return;
             }
 
             if (hit.collider.TryGetComponent(out InteractableDoor door))
             {
                 ShowText(door.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) door.Interact();
+                if (BotInput.GetKeyDown(KeyCode.E)) door.Interact();
                 return;
             }
 
-            // 2. Проверка на ПРЕДМЕТ (камни, фонарик и т.д.)
+            // 2. РџСЂРѕРІРµСЂРєР° РЅР° РџР Р•Р”РњР•Рў (РєР°РјРЅРё, С„РѕРЅР°СЂРёРє Рё С‚.Рґ.)
             if (hit.collider.TryGetComponent(out PickupItem item))
             {
-                ShowText(item.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) item.Pickup(playerInventory);
+                ShowText(playerInventory.CanAdd(item.item) ? item.prompt : "РќРµС‚ РјРµСЃС‚Р°: G вЂ” РІС‹Р±СЂРѕСЃРёС‚СЊ РїСЂРµРґРјРµС‚ РІ СЂСѓРєРµ");
+                if (BotInput.GetKeyDown(KeyCode.E)) item.Pickup(playerInventory);
                 return;
             }
 
-            // 3. Проверка на NPC (Наркоман)
+            // 3. РџСЂРѕРІРµСЂРєР° РЅР° NPC (РќР°СЂРєРѕРјР°РЅ)
             if (hit.collider.TryGetComponent(out NPCDialogueController npc))
             {
-                ShowText("Нажмите E, чтобы заговорить");
-                if (Input.GetKeyDown(KeyCode.E)) npc.Interact();
+                ShowText("РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ Р·Р°РіРѕРІРѕСЂРёС‚СЊ");
+                if (BotInput.GetKeyDown(KeyCode.E)) npc.Interact();
                 return;
             }
 
-            // 4. Проверка на ТЕЛЕФОН (входящий звонок с вибрацией)
+            // 4. РџСЂРѕРІРµСЂРєР° РЅР° РўР•Р›Р•Р¤РћРќ (РІС…РѕРґСЏС‰РёР№ Р·РІРѕРЅРѕРє СЃ РІРёР±СЂР°С†РёРµР№)
             if (hit.collider.TryGetComponent(out PhoneController phone))
             {
                 if (phone.IsRinging())
                 {
-                    ShowText("Нажмите E, чтобы ответить");
-                    if (Input.GetKeyDown(KeyCode.E)) phone.AnswerPhone();
+                    ShowText("РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РѕС‚РІРµС‚РёС‚СЊ");
+                    if (BotInput.GetKeyDown(KeyCode.E)) phone.AnswerPhone();
                 }
                 else
                 {
-                    ShowText("Нажмите E, чтобы проверить телефон");
-                    if (Input.GetKeyDown(KeyCode.E)) phone.StartRinging();
+                    ShowText("РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РїСЂРѕРІРµСЂРёС‚СЊ С‚РµР»РµС„РѕРЅ");
+                    if (BotInput.GetKeyDown(KeyCode.E)) phone.StartRinging();
                 }
                 return;
             }
 
-            // 5. Проверка на ДИАЛОГ (второй телефон с аудиосообщением)
+            // 5. РџСЂРѕРІРµСЂРєР° РЅР° Р”РРђР›РћР“ (РІС‚РѕСЂРѕР№ С‚РµР»РµС„РѕРЅ СЃ Р°СѓРґРёРѕСЃРѕРѕР±С‰РµРЅРёРµРј)
             if (hit.collider.TryGetComponent(out DialogueTrigger trigger))
             {
-                ShowText("Нажмите E, чтобы прослушать");
-                if (Input.GetKeyDown(KeyCode.E)) trigger.TriggerDialogue();
+                ShowText("РќР°Р¶РјРёС‚Рµ E, С‡С‚РѕР±С‹ РїСЂРѕСЃР»СѓС€Р°С‚СЊ");
+                if (BotInput.GetKeyDown(KeyCode.E)) trigger.TriggerDialogue();
                 return;
             }
 
-            // 6. Проверка на ТЕЛЕВИЗОР
+            // 6. РџСЂРѕРІРµСЂРєР° РЅР° РўР•Р›Р•Р’РР—РћР 
             if (hit.collider.TryGetComponent(out InteractableTV tv))
             {
                 ShowText(tv.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) tv.Interact();
+                if (BotInput.GetKeyDown(KeyCode.E)) tv.Interact();
                 return;
             }
 
-            // 7. Проверка на ПЕНТАГРАММУ
+            // 7. РџСЂРѕРІРµСЂРєР° РЅР° РџР•РќРўРђР“Р РђРњРњРЈ
             if (hit.collider.TryGetComponent(out Pentagram pentagram))
             {
                 ShowText(pentagram.GetPrompt(playerInventory));
-                if (Input.GetKeyDown(KeyCode.E)) pentagram.Interact(playerInventory);
+                if (BotInput.GetKeyDown(KeyCode.E)) pentagram.Interact(playerInventory);
                 return;
             }
 
-            // 8. Проверка на СВЕЧУ
+            // 8. РџСЂРѕРІРµСЂРєР° РЅР° РЎР’Р•Р§РЈ
             if (hit.collider.TryGetComponent(out CandleInteract candle))
             {
                 ShowText(candle.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) candle.TryLight(playerInventory);
+                if (BotInput.GetKeyDown(KeyCode.E)) candle.TryLight(playerInventory);
                 return;
             }
 
-            // 10. План эвакуации на стене
+            // 10. РџР»Р°РЅ СЌРІР°РєСѓР°С†РёРё РЅР° СЃС‚РµРЅРµ
             if (hit.collider.TryGetComponent(out EvacuationPlan plan))
             {
                 ShowText(plan.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) plan.Interact();
+                if (BotInput.GetKeyDown(KeyCode.E)) plan.Interact();
                 return;
             }
 
-            // 9. Проверка на ШКАФ (Укрытие)
+            // 9. РџСЂРѕРІРµСЂРєР° РЅР° РЁРљРђР¤ (РЈРєСЂС‹С‚РёРµ)
             if (hit.collider.TryGetComponent(out HideableCloset closet))
             {
                 ShowText(closet.prompt);
-                if (Input.GetKeyDown(KeyCode.E)) closet.Interact();
+                if (BotInput.GetKeyDown(KeyCode.E)) closet.Interact();
                 return;
             }
         }
 
-        // Если луч ни во что не попал или не нашел нужных компонентов
+        // Р•СЃР»Рё Р»СѓС‡ РЅРё РІРѕ С‡С‚Рѕ РЅРµ РїРѕРїР°Р» РёР»Рё РЅРµ РЅР°С€РµР» РЅСѓР¶РЅС‹С… РєРѕРјРїРѕРЅРµРЅС‚РѕРІ
         HideText();
     }
 

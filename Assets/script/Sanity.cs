@@ -121,7 +121,7 @@ public class Sanity : MonoBehaviour
 
         killer.Revive(float.MaxValue);   // камера встаёт на место; бабка больше не ловит
         killer.gameObject.SetActive(false);
-        MovePlayer(startPos, startRot);
+        MovePlayer(startPos - Vector3.up * 0.1f, startRot);   // MovePlayer приподнимает на 0.1, а здесь гравитации нет: стоим точно на полу
         if (player != null) player.enabled = false;
         if (QuestManager.Instance != null && QuestManager.Instance.callPhone != null) QuestManager.Instance.callPhone.StartRinging();
 
@@ -145,6 +145,8 @@ public class Sanity : MonoBehaviour
     // Тексты финального экрана: 1 - спасение, 2 - "не одна", 3 - петля
     public static void ApplyEnding(GameCompleteScreen s, bool loop)
     {
+        PlayerPrefs.SetInt(StudioSplash.LastEndingKey, loop ? 3 : Lost > 0 ? 2 : 1);
+        PlayerPrefs.Save();   // следующая заставка вспомнит этот финал
         if (loop)
         {
             s.title = "ТЫ ОСТАЛСЯ ЗДЕСЬ";

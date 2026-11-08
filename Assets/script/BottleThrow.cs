@@ -39,7 +39,7 @@ public class BottleThrow : MonoBehaviour
 
         var pc = GetComponent<PlayerController>();
         bool canAct = pc != null && pc.enabled && !PauseMenu.GameIsPaused && !DialogueManager.IsDialogueActive;
-        if (selected && !throwing && canAct && Input.GetMouseButtonDown(0)) StartCoroutine(Throw());
+        if (selected && !throwing && canAct && BotInput.GetMouseButtonDown(0)) StartCoroutine(Throw());
     }
 
     IEnumerator Throw()

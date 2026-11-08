@@ -146,10 +146,22 @@ public class PlaythroughTest : MonoBehaviour
             int before = inv.Count(s.item);
             s.Pickup(inv);
             if (inv.Count(s.item) > before) got++; else Log("FAIL камень не влез в инвентарь");
+            if (got == 1)
+            {
+                // Выброс и повторный подбор не должны второй раз запускать события камня
+                int collected = PickupItem.stonesCollected;
+                bool dropped = PickupItem.Drop(s.item, pc.transform.position);
+                inv.Remove(s.item, 1);
+                bool back = s.gameObject.activeSelf;
+                s.Pickup(inv);
+                Log(dropped && back && !s.gameObject.activeSelf && inv.Count(s.item) == before + 1 && PickupItem.stonesCollected == collected
+                    ? "OK   камень выброшен и подобран снова без повторного события"
+                    : "FAIL выброс камня: stonesCollected " + PickupItem.stonesCollected + ", было " + collected);
+            }
             yield return new WaitForSeconds(0.2f);
             if (got == 2)
             {
-                yield return new WaitForSeconds(2f);
+                yield return new WaitForSeconds(4.5f);   // тишина, затем скример
                 Log(ghost.activeInHierarchy ? "OK   после второго камня появилась бабка" : "FAIL бабка не появилась после второго камня");
                 // Чтобы тест не прервался поимкой, уводим её подальше
                 ghost.GetComponent<GhostChase>().SendFarFrom(pc.transform.position);

@@ -16,7 +16,7 @@ public class Inventory : MonoBehaviour
 
     public bool Add(ItemData item, int amount = 1)
     {
-        // Сначала пытаемся доложить в существующий стак
+        // РЎРЅР°С‡Р°Р»Р° РїС‹С‚Р°РµРјСЃСЏ РґРѕР»РѕР¶РёС‚СЊ РІ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ СЃС‚Р°Рє
         for (int i = 0; i < SIZE; i++)
         {
             if (slots[i].item == item && slots[i].amount < item.maxStack)
@@ -26,7 +26,7 @@ public class Inventory : MonoBehaviour
                 return true;
             }
         }
-        // Иначе — в пустой слот
+        // РРЅР°С‡Рµ вЂ” РІ РїСѓСЃС‚РѕР№ СЃР»РѕС‚
         for (int i = 0; i < SIZE; i++)
         {
             if (slots[i].IsEmpty)
@@ -37,6 +37,13 @@ public class Inventory : MonoBehaviour
                 return true;
             }
         }
+        return false;
+    }
+
+    public bool CanAdd(ItemData item)
+    {
+        foreach (var s in slots)
+            if (s.IsEmpty || (s.item == item && s.amount < item.maxStack)) return true;
         return false;
     }
 

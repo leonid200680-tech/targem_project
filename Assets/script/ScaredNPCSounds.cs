@@ -123,7 +123,6 @@ public class ScaredNPCSounds : MonoBehaviour
         var rnd = new System.Random(13);
         float Rand() => (float)rnd.NextDouble();
 
-        float lp = 0f, lp2 = 0f, hp = 0f;     // фильтры шума дыхания
         float r1a = 0f, r1b = 0f, r2a = 0f, r2b = 0f; // резонаторы голоса
         float phase = 0f;
 
@@ -133,41 +132,19 @@ public class ScaredNPCSounds : MonoBehaviour
             // Один цикл дыхания: вдох + выдох, быстрый и неровный
             float inhale = 0.35f + Rand() * 0.3f;
             float exhale = 0.45f + Rand() * 0.5f;
-            bool sob = Rand() < 0.45f;          // судорожный вдох в несколько толчков
-            int sobPulses = 2 + rnd.Next(3);
-            bool whimper = Rand() < 0.4f;       // поскуливание на выдохе
+            bool whimper = Rand() < 0.75f;       // поскуливание на выдохе
             float whimperStart = 260f + Rand() * 90f;
-            bool sniff = Rand() < 0.15f;
             float pause = 0.05f + Rand() * 0.25f;
 
             int inN = (int)(inhale * rate), exN = (int)(exhale * rate), paN = (int)(pause * rate);
 
-            // Вдох: шум повыше, при всхлипе - толчками
-            for (int k = 0; k < inN && i < n; k++, i++)
-            {
-                float u = k / (float)inN;
-                float env = Mathf.Sin(u * Mathf.PI);
-                if (sob)
-                {
-                    float p = Mathf.Repeat(u * sobPulses, 1f);
-                    env *= Mathf.Clamp01(p * 6f) * Mathf.Clamp01((1f - p) * 2.5f);
-                }
-                float white = Rand() * 2f - 1f;
-                lp += (white - lp) * 0.45f;
-                hp += (lp - hp) * 0.06f;
-                data[i] = (lp - hp) * env * 0.55f;
-            }
+            // Вдох беззвучный: шум дыхания игроки слышали как неприятное шуршание
+            i += inN;
 
-            // Выдох: шум мягче, иногда с голосом ("мм-ы-ы", высота плывёт вниз и дрожит)
+            // Выдох: только голос ("мм-ы-ы", высота плывёт вниз и дрожит)
             for (int k = 0; k < exN && i < n; k++, i++)
             {
                 float u = k / (float)exN;
-                float env = Mathf.Pow(Mathf.Sin(u * Mathf.PI), 0.7f) * (1f - u * 0.4f);
-                float white = Rand() * 2f - 1f;
-                lp2 += (white - lp2) * 0.22f;
-                hp += (lp2 - hp) * 0.04f;
-                float air = (lp2 - hp) * env * 0.4f;
-
                 float v = 0f;
                 if (whimper)
                 {
@@ -181,20 +158,7 @@ public class ScaredNPCSounds : MonoBehaviour
                     float venv = Mathf.Clamp01(u * 5f) * Mathf.Clamp01((1f - u) * 2.5f);
                     v = (f1 * 0.9f + f2 * 0.35f) * venv * 0.045f;
                 }
-                data[i] = air + v;
-            }
-
-            // Шмыганье носом: короткий яркий всхлип
-            if (sniff)
-            {
-                int sN = (int)(0.12f * rate);
-                for (int k = 0; k < sN && i < n; k++, i++)
-                {
-                    float u = k / (float)sN;
-                    float white = Rand() * 2f - 1f;
-                    lp += (white - lp) * 0.8f;
-                    data[i] = (white - lp) * Mathf.Sin(u * Mathf.PI) * 0.5f;
-                }
+                data[i] = v;
             }
 
             i += paN;
@@ -203,8 +167,8 @@ public class ScaredNPCSounds : MonoBehaviour
         // Нормализуем, чтобы самый громкий всхлип не клипповал
         float peak = 0f;
         foreach (float s in data) peak = Mathf.Max(peak, Mathf.Abs(s));
-        if (peak > 0.85f)
-            for (int k = 0; k < n; k++) data[k] *= 0.85f / peak;
+        if (peak > 0f)
+            for (int k = 0; k < n; k++) data[k] *= 0.6f / peak;
 
         // Склейка конца с началом, чтобы луп не щёлкал
         int fade = rate / 5;

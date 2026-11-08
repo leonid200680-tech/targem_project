@@ -4,43 +4,43 @@ using UnityEngine.UI;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
-    [Header("Ссылки")]
+    [Header("РЎСЃС‹Р»РєРё")]
     public Transform cameraTransform;
 
-    [Header("Настройки скорости")]
+    [Header("РќР°СЃС‚СЂРѕР№РєРё СЃРєРѕСЂРѕСЃС‚Рё")]
     public float walkSpeed = 4f;
     public float runSpeed = 7f;
-    public float acceleration = 30f;   // разгон, м/с за секунду
-    public float deceleration = 45f;   // торможение: отпустил клавишу - почти сразу стоит
+    public float acceleration = 30f;   // СЂР°Р·РіРѕРЅ, Рј/СЃ Р·Р° СЃРµРєСѓРЅРґСѓ
+    public float deceleration = 45f;   // С‚РѕСЂРјРѕР¶РµРЅРёРµ: РѕС‚РїСѓСЃС‚РёР» РєР»Р°РІРёС€Сѓ - РїРѕС‡С‚Рё СЃСЂР°Р·Сѓ СЃС‚РѕРёС‚
 
-    [Header("Прыжок и гравитация")]
+    [Header("РџСЂС‹Р¶РѕРє Рё РіСЂР°РІРёС‚Р°С†РёСЏ")]
     public float gravity = -15f;
     public float jumpHeight = 1.2f;
 
-    [Header("Ставина")]
+    [Header("РЎС‚Р°РІРёРЅР°")]
     public float maxStamina = 100f;
     public float currentStamina = 100f;
     public float staminaDrain = 15f;
     public float staminaRegen = 10f;
     public Slider staminaSlider;
 
-    [Header("Качание камеры (Head Bob)")]
+    [Header("РљР°С‡Р°РЅРёРµ РєР°РјРµСЂС‹ (Head Bob)")]
     public float bobSpeed = 14f;
     public float bobAmount = 0.05f;
     private float defaultCamY;
 
-    [Header("Звуки шагов")]
-    public AudioSource audioSource;      // Ссылка на AudioSource
-    public AudioClip[] footstepClips;    // Массив звуков (перетащим сюда)
-    public float walkStepInterval = 0.5f;// Интервал шагов при ходьбе
-    public float runStepInterval = 0.3f; // Интервал шагов при беге
+    [Header("Р—РІСѓРєРё С€Р°РіРѕРІ")]
+    public AudioSource audioSource;      // РЎСЃС‹Р»РєР° РЅР° AudioSource
+    public AudioClip[] footstepClips;    // РњР°СЃСЃРёРІ Р·РІСѓРєРѕРІ (РїРµСЂРµС‚Р°С‰РёРј СЃСЋРґР°)
+    public float walkStepInterval = 0.5f;// РРЅС‚РµСЂРІР°Р» С€Р°РіРѕРІ РїСЂРё С…РѕРґСЊР±Рµ
+    public float runStepInterval = 0.3f; // РРЅС‚РµСЂРІР°Р» С€Р°РіРѕРІ РїСЂРё Р±РµРіРµ
     private float stepTimer = 0f;
 
     private CharacterController controller;
     private Vector3 velocity;
     private Vector3 currentMoveVelocity;
     private float xRotation = 0f;
-    // Наклон камеры вверх/вниз (шкаф выставляет его сам, пока игрок внутри)
+    // РќР°РєР»РѕРЅ РєР°РјРµСЂС‹ РІРІРµСЂС…/РІРЅРёР· (С€РєР°С„ РІС‹СЃС‚Р°РІР»СЏРµС‚ РµРіРѕ СЃР°Рј, РїРѕРєР° РёРіСЂРѕРє РІРЅСѓС‚СЂРё)
     public float Pitch { get => xRotation; set => xRotation = value; }
     private bool isRunning = false;
     private float bobTimer = 0f;
@@ -59,7 +59,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        if (DialogueManager.IsDialogueActive) return; // Игрок не ходит во время диалога
+        if (DialogueManager.IsDialogueActive) return; // РРіСЂРѕРє РЅРµ С…РѕРґРёС‚ РІРѕ РІСЂРµРјСЏ РґРёР°Р»РѕРіР°
 
         if (PauseMenu.GameIsPaused) return;
         HandleMouseLook();
@@ -70,8 +70,8 @@ public class PlayerController : MonoBehaviour
 
     void HandleMouseLook()
     {
-        float mouseX = Input.GetAxis("Mouse X") * GameSettings.MouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * GameSettings.MouseSensitivity;
+        float mouseX = BotInput.GetAxis("Mouse X") * GameSettings.MouseSensitivity;
+        float mouseY = BotInput.GetAxis("Mouse Y") * GameSettings.MouseSensitivity;
 
         transform.Rotate(Vector3.up * mouseX);
 
@@ -87,11 +87,11 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement()
     {
-        // Raw: без встроенного сглаживания ввода, из-за него игрок "доезжал" после отпускания клавиши
-        float x = Input.GetAxisRaw("Horizontal");
-        float z = Input.GetAxisRaw("Vertical");
+        // Raw: Р±РµР· РІСЃС‚СЂРѕРµРЅРЅРѕРіРѕ СЃРіР»Р°Р¶РёРІР°РЅРёСЏ РІРІРѕРґР°, РёР·-Р·Р° РЅРµРіРѕ РёРіСЂРѕРє "РґРѕРµР·Р¶Р°Р»" РїРѕСЃР»Рµ РѕС‚РїСѓСЃРєР°РЅРёСЏ РєР»Р°РІРёС€Рё
+        float x = BotInput.GetAxisRaw("Horizontal");
+        float z = BotInput.GetAxisRaw("Vertical");
 
-        bool wantsToRun = Input.GetKey(KeyCode.LeftShift) && z > 0;
+        bool wantsToRun = BotInput.GetKey(KeyCode.LeftShift) && z > 0;
 
         if (wantsToRun && currentStamina > 0)
         {
@@ -111,24 +111,23 @@ public class PlayerController : MonoBehaviour
 
         float rate = targetMove.sqrMagnitude < currentMoveVelocity.sqrMagnitude ? deceleration : acceleration;
         currentMoveVelocity = Vector3.MoveTowards(currentMoveVelocity, targetMove, rate * Time.deltaTime);
-        controller.Move(currentMoveVelocity * Time.deltaTime);
-
-        // --- ЗВУКИ ШАГОВ ---
-        HandleFootsteps();
-
         if (controller.isGrounded && velocity.y < 0)
             velocity.y = -2f;
 
-        if (Input.GetButtonDown("Jump") && controller.isGrounded)
+        if (BotInput.GetButtonDown("Jump") && controller.isGrounded)
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
         velocity.y += gravity * Time.deltaTime;
-        controller.Move(velocity * Time.deltaTime);
+        // РћРґРёРЅ Move РЅР° РєР°РґСЂ: РїРѕСЃР»Рµ РѕС‚РґРµР»СЊРЅРѕРіРѕ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРѕРіРѕ isGrounded СЃР±СЂР°СЃС‹РІР°Р»СЃСЏ, Рё РїСЂС‹Р¶РѕРє СЃСЂР°Р±Р°С‚С‹РІР°Р» С‡РµСЂРµР· СЂР°Р·
+        controller.Move((currentMoveVelocity + velocity) * Time.deltaTime);
+
+        // --- Р—Р’РЈРљР РЁРђР“РћР’ ---
+        HandleFootsteps();
     }
 
     void HandleFootsteps()
     {
-        // Проверяем: на земле ли мы, движемся ли, и НЕ ИГРАЕТ ЛИ УЖЕ ЗВУК
+        // РџСЂРѕРІРµСЂСЏРµРј: РЅР° Р·РµРјР»Рµ Р»Рё РјС‹, РґРІРёР¶РµРјСЃСЏ Р»Рё, Рё РќР• РР“Р РђР•Рў Р›Р РЈР–Р• Р—Р’РЈРљ
         if (controller.isGrounded && currentMoveVelocity.magnitude > 0.1f && !audioSource.isPlaying)
         {
             stepTimer -= Time.deltaTime;
@@ -136,13 +135,13 @@ public class PlayerController : MonoBehaviour
             if (stepTimer <= 0f)
             {
                 PlayFootstepSound();
-                // Ставим таймер (Walk = 0.6, Run = 0.3)
+                // РЎС‚Р°РІРёРј С‚Р°Р№РјРµСЂ (Walk = 0.6, Run = 0.3)
                 stepTimer = isRunning ? runStepInterval : walkStepInterval;
             }
         }
         else if (!controller.isGrounded || currentMoveVelocity.magnitude <= 0.1f)
         {
-            // Если стоим — сбрасываем таймер
+            // Р•СЃР»Рё СЃС‚РѕРёРј вЂ” СЃР±СЂР°СЃС‹РІР°РµРј С‚Р°Р№РјРµСЂ
             stepTimer = 0f;
         }
     }
@@ -153,11 +152,11 @@ public class PlayerController : MonoBehaviour
     {
         if (audioSource != null && footstepClips.Length > 0)
         {
-            // Выбираем случайный звук из массива
+            // Р’С‹Р±РёСЂР°РµРј СЃР»СѓС‡Р°Р№РЅС‹Р№ Р·РІСѓРє РёР· РјР°СЃСЃРёРІР°
             int randomIndex = Random.Range(0, footstepClips.Length);
             AudioClip clip = footstepClips[randomIndex];
 
-            // Небольшой рандом по высоте тона, чтобы звук не был одинаковым
+            // РќРµР±РѕР»СЊС€РѕР№ СЂР°РЅРґРѕРј РїРѕ РІС‹СЃРѕС‚Рµ С‚РѕРЅР°, С‡С‚РѕР±С‹ Р·РІСѓРє РЅРµ Р±С‹Р» РѕРґРёРЅР°РєРѕРІС‹Рј
             audioSource.pitch = Random.Range(0.9f, 1.1f);
             audioSource.PlayOneShot(clip);
         }

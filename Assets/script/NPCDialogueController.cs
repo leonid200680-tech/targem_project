@@ -2,19 +2,81 @@ using UnityEngine;
 
 public class NPCDialogueController : MonoBehaviour
 {
-    // Состояния NPC
+    // РЎРѕСЃС‚РѕСЏРЅРёСЏ NPC
     public enum NPCState { FirstMeet, WaitingForBook, BookReturned, ThirdFloorAmbush }
     public NPCState currentState = NPCState.FirstMeet;
 
-    [Header("Ссылки")]
-    public Inventory playerInventory; // Сюда перетащи игрока (у него есть инвентарь)
-    public ItemData ritualBook;       // Сюда перетащи предмет "Книга ритуалов"
+    [Header("РЎСЃС‹Р»РєРё")]
+    public Inventory playerInventory; // РЎСЋРґР° РїРµСЂРµС‚Р°С‰Рё РёРіСЂРѕРєР° (Сѓ РЅРµРіРѕ РµСЃС‚СЊ РёРЅРІРµРЅС‚Р°СЂСЊ)
+    public ItemData ritualBook;       // РЎСЋРґР° РїРµСЂРµС‚Р°С‰Рё РїСЂРµРґРјРµС‚ "РљРЅРёРіР° СЂРёС‚СѓР°Р»РѕРІ"
 
-    [Header("Диалоги (Заполняются в инспекторе)")]
-    public DialogueLine[] firstMeetLines;    // Первый диалог
-    public DialogueLine[] waitingLines;      // Если игрок пришел без книги
-    public DialogueLine[] bookReturnedLines; // Диалог, когда книга в руках
-    public DialogueLine[] thirdFloorLines;   // Финальный диалог на 3 этаже
+    [Header("Р”РёР°Р»РѕРіРё (Р—Р°РїРѕР»РЅСЏСЋС‚СЃСЏ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ)")]
+    public DialogueLine[] firstMeetLines;    // РџРµСЂРІС‹Р№ РґРёР°Р»РѕРі
+    public DialogueLine[] waitingLines;      // Р•СЃР»Рё РёРіСЂРѕРє РїСЂРёС€РµР» Р±РµР· РєРЅРёРіРё
+    public DialogueLine[] bookReturnedLines; // Р”РёР°Р»РѕРі, РєРѕРіРґР° РєРЅРёРіР° РІ СЂСѓРєР°С…
+    public DialogueLine[] thirdFloorLines;   // Р¤РёРЅР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі РЅР° 3 СЌС‚Р°Р¶Рµ
+
+    [Header("Р›Р°РјРїР°-РѕСЂРёРµРЅС‚РёСЂ Сѓ РµРіРѕ СѓРєСЂС‹С‚РёСЏ")]
+    private Light guideLamp;
+    private float lampLevel;
+
+    void Start() => PlaceGuideLamp();
+
+    // РљСЂР°СЃРЅР°СЏ РјРёРіР°СЋС‰Р°СЏ Р»Р°РјРїР° Сѓ РІС…РѕРґР° Рє СЃРµРєС‚Р°РЅС‚Сѓ
+    void PlaceGuideLamp()
+    {
+        // РќР°РІРјРµС€ РЅРµ СЃРѕРµРґРёРЅСЏРµС‚ РµРіРѕ РєРѕРјРЅР°С‚Сѓ СЃ РєРѕСЂРёРґРѕСЂРѕРј, РїРѕСЌС‚РѕРјСѓ РѕСЂРёРµРЅС‚РёСЂ - С‚Р°Р±Р»РёС‡РєР° Р±Р»РёР¶Р°Р№С€РµРіРѕ РІС…РѕРґР° РЅР° РµРіРѕ СЌС‚Р°Р¶Рµ
+        var plates = GameObject.Find("Room Numbers");
+        if (plates == null) return;
+        Vector3 door = Vector3.zero;
+        float best = float.MaxValue;
+        foreach (var t in plates.GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            Vector3 p = t.transform.position;
+            if (p.y < transform.position.y || p.y > transform.position.y + 3f) continue;   // С‚РѕР»СЊРєРѕ РµРіРѕ СЌС‚Р°Р¶
+            float d = (p - transform.position).sqrMagnitude;
+            if (d < best) { best = d; door = p; }
+        }
+        if (best == float.MaxValue) return;
+
+        var go = new GameObject("Satanist Guide Lamp");
+        go.transform.position = door + Vector3.up * 0.7f;
+        guideLamp = go.AddComponent<Light>();
+        go.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalLightData>();
+        guideLamp.type = LightType.Point;
+        guideLamp.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
+        guideLamp.range = 7f;
+        guideLamp.color = new Color(1f, 0.15f, 0.1f);
+        guideLamp.shadows = LightShadows.None;
+        lampLevel = 420f;
+    }
+
+    void Update()
+    {
+        if (guideLamp == null) return;
+        guideLamp.enabled = currentState != NPCState.ThirdFloorAmbush;
+        guideLamp.intensity = lampLevel * (Mathf.PerlinNoise(Time.time * 7f, 0.3f) > 0.42f ? 1f : 0.12f);
+    }
+
+    DialogueLine[] WithHint(DialogueLine[] lines, string hint)
+    {
+        string speaker = firstMeetLines != null && firstMeetLines.Length > 0 ? firstMeetLines[0].speakerName : "";
+        var line = new DialogueLine { speakerName = speaker, text = hint };
+        if (lines == null) return new[] { line };
+        var all = new DialogueLine[lines.Length + 1];
+        lines.CopyTo(all, 0);
+        all[lines.Length] = line;
+        return all;
+    }
+
+    string BookHint()
+    {
+        var qm = QuestManager.Instance;
+        if (qm != null)
+            foreach (var p in FindObjectsByType<PickupItem>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (p.item == ritualBook && p.gameObject.activeSelf) return "РљРЅРёРіР° С‚Р°Рј: " + qm.WhereIs(p.transform.position) + ".";
+        return "РљРЅРёРіСѓ РёС‰Рё. Р‘РµР· РЅРµС‘ РЅРёС‡РµРіРѕ РЅРµ РІС‹Р№РґРµС‚.";
+    }
 
     public void Interact()
     {
@@ -22,24 +84,26 @@ public class NPCDialogueController : MonoBehaviour
         {
             case NPCState.FirstMeet:
                 StartDialogue(firstMeetLines);
-                currentState = NPCState.WaitingForBook; // Меняем состояние
+                currentState = NPCState.WaitingForBook; // РњРµРЅСЏРµРј СЃРѕСЃС‚РѕСЏРЅРёРµ
                 break;
 
             case NPCState.WaitingForBook:
                 if (playerInventory != null && playerInventory.Has(ritualBook))
                 {
-                    StartDialogue(bookReturnedLines); // Игрок принес книгу
+                    StartDialogue(bookReturnedLines); // РРіСЂРѕРє РїСЂРёРЅРµСЃ РєРЅРёРіСѓ
                     playerInventory.Remove(ritualBook, 1);
                     currentState = NPCState.BookReturned;
                 }
                 else
                 {
-                    StartDialogue(waitingLines); // Игрок забыл книгу
+                    StartDialogue(WithHint(waitingLines, BookHint())); // РРіСЂРѕРє Р·Р°Р±С‹Р» РєРЅРёРіСѓ
                 }
                 break;
 
             case NPCState.BookReturned:
-                StartDialogue(waitingLines); // "Ну что, нашел камни?"
+                var quest = QuestManager.Instance;
+                string stones = quest != null ? quest.StonesHint() : null;
+                StartDialogue(WithHint(null, stones ?? "Р’СЃРµ РєР°РјРЅРё Сѓ С‚РµР±СЏ? РќРµСЃРё РёС… Рє РїРµРЅС‚Р°РіСЂР°РјРјРµ."));
                 break;
 
             case NPCState.ThirdFloorAmbush:
@@ -56,7 +120,7 @@ public class NPCDialogueController : MonoBehaviour
         }
     }
 
-    // Этот метод вызовем, когда игрок поднимется на 3 этаж
+    // Р­С‚РѕС‚ РјРµС‚РѕРґ РІС‹Р·РѕРІРµРј, РєРѕРіРґР° РёРіСЂРѕРє РїРѕРґРЅРёРјРµС‚СЃСЏ РЅР° 3 СЌС‚Р°Р¶
     public void StartThirdFloorAmbush()
     {
         currentState = NPCState.ThirdFloorAmbush;

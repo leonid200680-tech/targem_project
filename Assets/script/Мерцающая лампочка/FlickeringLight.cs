@@ -3,16 +3,17 @@ using System.Collections;
 
 public class FlickeringLight : MonoBehaviour
 {
-    [Header("Компоненты (заполнить в инспекторе)")]
-    public Light targetLight;               // Сюда кидаем сам источник света (Light)
-    public AudioSource buzzAudio;           // Источник звука (гудение лампы)
-    public Renderer bulbRenderer;           // Модель/спрайт самой лампочки (чтобы она тоже мигала)
+    [Header("РљРѕРјРїРѕРЅРµРЅС‚С‹ (Р·Р°РїРѕР»РЅРёС‚СЊ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ)")]
+    public Light targetLight;               // РЎСЋРґР° РєРёРґР°РµРј СЃР°Рј РёСЃС‚РѕС‡РЅРёРє СЃРІРµС‚Р° (Light)
+    public AudioSource buzzAudio;           // РСЃС‚РѕС‡РЅРёРє Р·РІСѓРєР° (РіСѓРґРµРЅРёРµ Р»Р°РјРїС‹)
+    private float buzzBase = -1f;
+    public Renderer bulbRenderer;           // РњРѕРґРµР»СЊ/СЃРїСЂР°Р№С‚ СЃР°РјРѕР№ Р»Р°РјРїРѕС‡РєРё (С‡С‚РѕР±С‹ РѕРЅР° С‚РѕР¶Рµ РјРёРіР°Р»Р°)
 
-    [Header("Настройки света")]
-    public float minIntensity = 0.2f;       // Минимальная яркость (когда почти потухла)
-    public float maxIntensity = 2.5f;       // Максимальная яркость (когда светит)
-    public float minWait = 0.05f;           // Мин. пауза между мерцаниями
-    public float maxWait = 0.5f;            // Макс. пауза между мерцаниями
+    [Header("РќР°СЃС‚СЂРѕР№РєРё СЃРІРµС‚Р°")]
+    public float minIntensity = 0.2f;       // РњРёРЅРёРјР°Р»СЊРЅР°СЏ СЏСЂРєРѕСЃС‚СЊ (РєРѕРіРґР° РїРѕС‡С‚Рё РїРѕС‚СѓС…Р»Р°)
+    public float maxIntensity = 2.5f;       // РњР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЏСЂРєРѕСЃС‚СЊ (РєРѕРіРґР° СЃРІРµС‚РёС‚)
+    public float minWait = 0.05f;           // РњРёРЅ. РїР°СѓР·Р° РјРµР¶РґСѓ РјРµСЂС†Р°РЅРёСЏРјРё
+    public float maxWait = 0.5f;            // РњР°РєСЃ. РїР°СѓР·Р° РјРµР¶РґСѓ РјРµСЂС†Р°РЅРёСЏРјРё
 
     private Material bulbMaterial;
     private float originalIntensity;
@@ -24,7 +25,7 @@ public class FlickeringLight : MonoBehaviour
         originalIntensity = maxIntensity;
         if (targetLight != null) targetLight.intensity = originalIntensity;
 
-        // Если передали модель лампочки, находим её материал
+        // Р•СЃР»Рё РїРµСЂРµРґР°Р»Рё РјРѕРґРµР»СЊ Р»Р°РјРїРѕС‡РєРё, РЅР°С…РѕРґРёРј РµС‘ РјР°С‚РµСЂРёР°Р»
         if (bulbRenderer != null)
         {
             bulbMaterial = bulbRenderer.material;
@@ -32,34 +33,41 @@ public class FlickeringLight : MonoBehaviour
 
         if (buzzAudio != null)
         {
-            buzzAudio.Play(); // Включаем гудение при старте
+            buzzAudio.Play(); // Р’РєР»СЋС‡Р°РµРј РіСѓРґРµРЅРёРµ РїСЂРё СЃС‚Р°СЂС‚Рµ
         }
 
         StartCoroutine(FlickerRoutine());
+    }
+
+    void Update()
+    {
+        if (buzzAudio == null) return;
+        if (buzzBase < 0f) buzzBase = buzzAudio.volume;
+        buzzAudio.volume = buzzBase * (1f - OutdoorSound.Hush);
     }
 
     IEnumerator FlickerRoutine()
     {
         while (true)
         {
-            // 1. Случайная пауза (лампа горит стабильно)
-            yield return new WaitForSeconds(Random.Range(1f, 4f) * Mathf.Lerp(1f, 0.35f, FearMeter.Level)); // страх - чаще
+            // 1. РЎР»СѓС‡Р°Р№РЅР°СЏ РїР°СѓР·Р° (Р»Р°РјРїР° РіРѕСЂРёС‚ СЃС‚Р°Р±РёР»СЊРЅРѕ)
+            yield return new WaitForSeconds(Random.Range(1f, 4f) * Mathf.Lerp(1f, 0.35f, FearMeter.Level)); // СЃС‚СЂР°С… - С‡Р°С‰Рµ
 
-            // 2. Начинается мерцание (от 3 до 6 вспышек подряд)
+            // 2. РќР°С‡РёРЅР°РµС‚СЃСЏ РјРµСЂС†Р°РЅРёРµ (РѕС‚ 3 РґРѕ 6 РІСЃРїС‹С€РµРє РїРѕРґСЂСЏРґ)
             int flickerCount = Random.Range(3, 6);
             for (int i = 0; i < flickerCount; i++)
             {
-                // Резко тушим
+                // Р РµР·РєРѕ С‚СѓС€РёРј
                 SetLightState(false);
                 yield return new WaitForSeconds(Random.Range(minWait, maxWait));
 
-                // Резко включаем
+                // Р РµР·РєРѕ РІРєР»СЋС‡Р°РµРј
                 SetLightState(true);
                 yield return new WaitForSeconds(Random.Range(minWait, maxWait));
             }
 
-            // 3. Иногда лампа полностью вырубается на пару секунд (черный экран)
-            if (Random.value < 0.3f) // 30% шанс, что вырубится дольше
+            // 3. РРЅРѕРіРґР° Р»Р°РјРїР° РїРѕР»РЅРѕСЃС‚СЊСЋ РІС‹СЂСѓР±Р°РµС‚СЃСЏ РЅР° РїР°СЂСѓ СЃРµРєСѓРЅРґ (С‡РµСЂРЅС‹Р№ СЌРєСЂР°РЅ)
+            if (Random.value < 0.3f) // 30% С€Р°РЅСЃ, С‡С‚Рѕ РІС‹СЂСѓР±РёС‚СЃСЏ РґРѕР»СЊС€Рµ
             {
                 SetLightState(false);
                 yield return new WaitForSeconds(Random.Range(1f, 3f));
@@ -70,23 +78,23 @@ public class FlickeringLight : MonoBehaviour
 
     void SetLightState(bool isOn)
     {
-        // Включаем/выключаем яркость самого света
+        // Р’РєР»СЋС‡Р°РµРј/РІС‹РєР»СЋС‡Р°РµРј СЏСЂРєРѕСЃС‚СЊ СЃР°РјРѕРіРѕ СЃРІРµС‚Р°
         if (targetLight != null)
         {
             targetLight.intensity = isOn ? maxIntensity : minIntensity;
         }
 
-        // Меняем свечение на самой модели лампочки (Эмиссия)
+        // РњРµРЅСЏРµРј СЃРІРµС‡РµРЅРёРµ РЅР° СЃР°РјРѕР№ РјРѕРґРµР»Рё Р»Р°РјРїРѕС‡РєРё (Р­РјРёСЃСЃРёСЏ)
         if (bulbMaterial != null)
         {
             if (isOn)
             {
                 bulbMaterial.EnableKeyword("_EMISSION");
-                bulbMaterial.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.5f) * 2f); // Теплый желтый свет
+                bulbMaterial.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.5f) * 2f); // РўРµРїР»С‹Р№ Р¶РµР»С‚С‹Р№ СЃРІРµС‚
             }
             else
             {
-                bulbMaterial.SetColor("_EmissionColor", Color.black); // Лампочка потухла
+                bulbMaterial.SetColor("_EmissionColor", Color.black); // Р›Р°РјРїРѕС‡РєР° РїРѕС‚СѓС…Р»Р°
             }
         }
 

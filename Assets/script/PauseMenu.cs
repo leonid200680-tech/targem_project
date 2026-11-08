@@ -25,8 +25,16 @@ public class PauseMenu : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (BotInput.GetKeyDown(KeyCode.Escape))
         {
+            // Карта и камеры закрываются по Esc, пауза при этом не открывается
+            if (!GameIsPaused && EvacuationPlan.CloseOpen()) return;
+            if (!GameIsPaused)
+            {
+                var tv = FindAnyObjectByType<InteractableTV>();
+                if (tv != null && tv.IsViewing) { tv.TryExit(); return; }
+            }
+
             // Если открыты настройки, Esc должен закрывать их
             if (settingsPanel.activeSelf)
             {
@@ -41,6 +49,7 @@ public class PauseMenu : MonoBehaviour
 
     public void Resume()
     {
+        PauseGranny.Hide();
         pauseMenuPanel.SetActive(false);
         if (gameplayHUD != null) gameplayHUD.SetActive(true);
 
@@ -70,6 +79,7 @@ public class PauseMenu : MonoBehaviour
         Time.timeScale = 0f;
         GameIsPaused = true;
         AudioListener.pause = true;
+        PauseGranny.TryShow();
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
@@ -100,6 +110,10 @@ public class PauseMenu : MonoBehaviour
         // Меню и игра в одной сцене: перезагружаем её, чтобы следующая игра началась с нуля
         HideableCloset.IsPlayerHidden = false;
         PickupItem.stonesCollected = 0;
+        OutdoorSound.EndingSilence = false;
+        PauseGranny.Hide();
+        PauseGranny.Shown = 0;
+        HideableCloset.FaceUsed = false;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

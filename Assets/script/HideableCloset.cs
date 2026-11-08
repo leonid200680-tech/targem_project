@@ -24,6 +24,8 @@ public class HideableCloset : MonoBehaviour
     public static bool IsPlayerHidden = false; // Глобальный флаг: игрок в укрытии
     // Один раз за игру бабка подходит к шкафу, где сидит игрок, и заглядывает в решётку (но не трогает)
     public static bool PeekUsed = false;
+    // Один раз за игру она оказывается в шкафу вместе с игроком. Только смотрит: не ловит и рассудок не забирает
+    public static bool FaceUsed = false;
 
     private bool isPlayerInside = false;
     private bool moving = false;
@@ -145,7 +147,7 @@ public class HideableCloset : MonoBehaviour
         if (!isPlayerInside || moving) return;
 
         // Выход из шкафа (не в тот же кадр, когда залезли)
-        if (Time.frameCount != enteredFrame && Input.GetKeyDown(KeyCode.E) && !PauseMenu.GameIsPaused)
+        if (Time.frameCount != enteredFrame && BotInput.GetKeyDown(KeyCode.E) && !PauseMenu.GameIsPaused)
         {
             StartCoroutine(ExitRoutine());
             return;
@@ -153,8 +155,8 @@ public class HideableCloset : MonoBehaviour
 
         // Внутри можно немного осмотреться
         if (PauseMenu.GameIsPaused || pc == null || pc.cameraTransform == null) return;
-        lookX = Mathf.Clamp(lookX + Input.GetAxis("Mouse X") * GameSettings.MouseSensitivity, -lookYaw, lookYaw);
-        lookY = Mathf.Clamp(lookY - Input.GetAxis("Mouse Y") * GameSettings.MouseSensitivity, -lookPitch, lookPitch);
+        lookX = Mathf.Clamp(lookX + BotInput.GetAxis("Mouse X") * GameSettings.MouseSensitivity, -lookYaw, lookYaw);
+        lookY = Mathf.Clamp(lookY - BotInput.GetAxis("Mouse Y") * GameSettings.MouseSensitivity, -lookPitch, lookPitch);
         playerObj.transform.rotation = hidePoint.rotation * Quaternion.Euler(0f, lookX, 0f);
         SetPitch(lookY);
     }
@@ -188,7 +190,116 @@ public class HideableCloset : MonoBehaviour
         yield return Glide(new[] { frontDoorPoint, hidePoint.position }, hidePoint.rotation, 0f, enterTime);
         moving = false;
 
-        if (!PeekUsed) StartCoroutine(GrannyPeek());
+        if (!FaceUsed && PickupItem.stonesCollected >= 2) { FaceUsed = true; StartCoroutine(FaceBehind()); }
+        else if (!PeekUsed) StartCoroutine(GrannyPeek());
+    }
+
+    // Двери закрылись, всё стихло, за спиной дыхание. Камера сама медленно поворачивается - лицо вплотную
+    IEnumerator FaceBehind()
+    {
+        var hm = FindAnyObjectByType<HallucinationManager>(FindObjectsInactive.Include);
+        var cam = pc.cameraTransform;
+        if (hm == null || hm.realGhost == null) yield break;
+        moving = true;   // ни выйти, ни осмотреться
+
+        OutdoorSound.HushFor(9f);
+        yield return new WaitForSeconds(1.2f);
+        var breath = cam.gameObject.AddComponent<AudioSource>();
+        breath.spatialBlend = 0f;
+        breath.clip = BreathClip();
+        breath.loop = true;
+        breath.Play();
+        yield return new WaitForSeconds(1.8f);
+
+        Quaternion startRot = playerObj.transform.rotation;
+        Quaternion backRot = startRot * Quaternion.Euler(0f, 170f, 0f);
+        SetPitch(0f);
+        Vector3 fwd = backRot * Vector3.forward;
+
+        var face = GrannyJumpscare.MakeCopy(hm.realGhost);
+        face.name = "Closet Granny";
+        var anim = face.GetComponent<Animator>();
+        Transform head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
+        face.transform.rotation = Quaternion.LookRotation(-fwd);
+        face.SetActive(true);
+        if (anim != null) { anim.speed = 0f; anim.Play("скример", 0, 0.15f); anim.Update(0f); }
+        Vector3 startPos = playerObj.transform.position;
+        // Камера смещена от центра игрока: считаем, где она окажется после поворота
+        Vector3 eyeLine = startPos + backRot * (Quaternion.Inverse(startRot) * (cam.position - startPos));
+        // Шкаф неглубокий: сдвигаем игрока к дверцам, иначе лицо окажется за задней стенкой
+        Vector3 toDoors = front * 0.27f;
+        playerObj.transform.position = startPos + toDoors;
+        eyeLine += toDoors;
+
+        // Голова ставится так же, как в скримере: на таком расстоянии лицо видно целиком
+        void PlaceFace(float dist)
+        {
+            Vector3 headAt = head != null ? head.position : face.transform.position + Vector3.up * 1.55f;
+            face.transform.position += eyeLine + fwd * dist - Vector3.up * 0.1f - headAt;
+        }
+        const float faceFar = 0.44f, faceNear = 0.33f;
+        PlaceFace(faceFar);
+
+        // Тусклый свет снизу: иначе в шкафу лица не видно
+        var lightGo = new GameObject("Closet Face Light");
+        lightGo.transform.SetParent(cam, false);
+        lightGo.transform.localPosition = new Vector3(0.05f, -0.3f, 0.05f);
+        var glow = lightGo.AddComponent<Light>();
+        lightGo.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalLightData>();
+        glow.type = LightType.Point;
+        glow.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
+        glow.intensity = 45f;
+        glow.range = 2f;
+        glow.color = new Color(1f, 0.75f, 0.6f);
+        glow.shadows = LightShadows.None;
+
+        const float turnTime = 2.4f;
+        for (float t = 0f; t < turnTime; t += Time.deltaTime)
+        {
+            playerObj.transform.rotation = Quaternion.Slerp(startRot, backRot, Mathf.SmoothStep(0f, 1f, t / turnTime));
+            yield return null;
+        }
+        playerObj.transform.rotation = backRot;
+
+        // Лицо медленно придвигается
+        for (float t = 0f; t < 1.7f; t += Time.deltaTime)
+        {
+            PlaceFace(Mathf.Lerp(faceFar, faceNear, t / 1.7f));
+            yield return null;
+        }
+
+        // Моргнул - её нет
+        Destroy(face);
+        Destroy(lightGo);
+        breath.Stop();
+        Destroy(breath);
+        playerObj.transform.SetPositionAndRotation(startPos, startRot);
+        lookX = lookY = 0f;
+        SetPitch(0f);
+        moving = false;
+    }
+
+    static AudioClip breathClip;
+
+    // Медленное хриплое дыхание у самого уха
+    static AudioClip BreathClip()
+    {
+        if (breathClip != null) return breathClip;
+        const int rate = 22050;
+        int n = rate * 3;
+        var data = new float[n];
+        var rnd = new System.Random(9);
+        float lp = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            float white = (float)rnd.NextDouble() * 2f - 1f;
+            lp += (white - lp) * (0.12f + 0.1f * Mathf.Abs(Mathf.Sin(t * 19f)));
+            data[i] = lp * Mathf.Pow(Mathf.Abs(Mathf.Sin(t * Mathf.PI / 1.5f)), 1.6f) * 1.6f;
+        }
+        breathClip = AudioClip.Create("Closet Breath", n, 1, rate, false);
+        breathClip.SetData(data, 0);
+        return breathClip;
     }
 
     // Бабка рядом (по пути не дальше 30 м) - через пару секунд она подходит и заглядывает в щели

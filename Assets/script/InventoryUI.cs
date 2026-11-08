@@ -7,7 +7,7 @@ public class InventoryUI : MonoBehaviour
     public InventorySlotUI slotPrefab;
 
     private InventorySlotUI[] slotUIs;
-    private int selectedIndex = 0; // “ÂÍÛ˘ËÈ ‚˚·‡ÌÌ˚È ÒÎÓÚ
+    private int selectedIndex = 0; // –¢–µ–∫—É—â–∏–π –≤—ã–±—Ä–∞–Ω–Ω—ã–π —Å–ª–æ—Ç
 
     void Start()
     {
@@ -19,35 +19,59 @@ public class InventoryUI : MonoBehaviour
 
         inventory.OnChanged += Refresh;
         Refresh();
-        SelectSlot(0); // œÓ ÛÏÓÎ˜‡ÌË˛ ‚˚·‡Ì ÔÂ‚˚È ÒÎÓÚ
+        SelectSlot(0); // –ü–æ —É–º–æ–ª—á–∞–Ω–∏—é –≤—ã–±—Ä–∞–Ω –ø–µ—Ä–≤—ã–π —Å–ª–æ—Ç
     }
 
     void Update()
     {
-        // œÂÂÍÎ˛˜ÂÌËÂ ˆËÙ‡ÏË 1-5
-        if (Input.GetKeyDown(KeyCode.Alpha1)) SelectSlot(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) SelectSlot(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) SelectSlot(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) SelectSlot(3);
-        if (Input.GetKeyDown(KeyCode.Alpha5)) SelectSlot(4);
+        // –ü–µ—Ä–µ–∫–ª—é—á–µ–Ω–∏–µ —Ü–∏—Ñ—Ä–∞–º–∏ 1-5
+        if (BotInput.GetKeyDown(KeyCode.Alpha1)) SelectSlot(0);
+        if (BotInput.GetKeyDown(KeyCode.Alpha2)) SelectSlot(1);
+        if (BotInput.GetKeyDown(KeyCode.Alpha3)) SelectSlot(2);
+        if (BotInput.GetKeyDown(KeyCode.Alpha4)) SelectSlot(3);
+        if (BotInput.GetKeyDown(KeyCode.Alpha5)) SelectSlot(4);
 
-        // œÂÂÍÎ˛˜ÂÌËÂ ÍÓÎÂÒËÍÓÏ Ï˚¯Ë
-        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        // –ü–µ—Ä–µ–∫–ª—é—á–µ–Ω–∏–µ –∫–æ–ª–µ—Å–∏–∫–æ–º –º—ã—à–∏
+        float scroll = BotInput.GetAxis("Mouse ScrollWheel");
         if (scroll > 0f) SelectSlot((selectedIndex - 1 + Inventory.SIZE) % Inventory.SIZE);
         if (scroll < 0f) SelectSlot((selectedIndex + 1) % Inventory.SIZE);
+
+        if (BotInput.GetKeyDown(KeyCode.G) && !DialogueManager.IsDialogueActive && !PauseMenu.GameIsPaused
+            && !HideableCloset.IsPlayerHidden && !EvacuationPlan.IsOpen) DropSelected();
+    }
+
+    // –ü—Ä–µ–¥–º–µ—Ç –ø–∞–¥–∞–µ—Ç –Ω–∞ –ø–æ–ª –ø–µ—Ä–µ–¥ –∏–≥—Ä–æ–∫–æ–º
+    void DropSelected()
+    {
+        var item = GetSelectedItem();
+        var cam = Camera.main;
+        if (item == null || cam == null) return;
+        var tv = FindAnyObjectByType<InteractableTV>();
+        if (tv != null && tv.IsViewing) return;
+        Vector3 fwd = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+        float reach = Physics.Raycast(cam.transform.position, fwd, out var wall, 1.1f, ~0, QueryTriggerInteraction.Ignore) ? wall.distance - 0.2f : 0.9f;
+        Vector3 from = cam.transform.position + fwd * Mathf.Max(0.3f, reach);
+        // –ë–ª–∏–∂–∞–π—à–∞—è –ø–æ–≤–µ—Ä—Ö–Ω–æ—Å—Ç—å –≤–Ω–∏–∑—É, –∫—Ä–æ–º–µ —Å–∞–º–æ–≥–æ –∏–≥—Ä–æ–∫–∞: –∏–Ω–∞—á–µ –ø—Ä–µ–¥–º–µ—Ç –ø–æ–≤–∏—Å–∞–ª –Ω–∞ –µ–≥–æ –∫–æ–ª–ª–∞–π–¥–µ—Ä–µ
+        float nearest = float.MaxValue;
+        Vector3 ground = default;
+        foreach (var hit in Physics.RaycastAll(from, Vector3.down, 4f, ~0, QueryTriggerInteraction.Ignore))
+            if (hit.distance < nearest && !hit.collider.transform.IsChildOf(inventory.transform)) { nearest = hit.distance; ground = hit.point; }
+        if (nearest == float.MaxValue) return;
+        Vector3 hand = cam.transform.position + cam.transform.forward * 0.35f - cam.transform.up * 0.3f;
+        if (PickupItem.Drop(item, ground, hand)) inventory.Remove(item, 1);
     }
 
     void SelectSlot(int index)
     {
         if (slotUIs == null || slotUIs.Length == 0) return;
 
-        // ”·Ë‡ÂÏ ÔÓ‰Ò‚ÂÚÍÛ ÒÓ ÒÚ‡Ó„Ó
+        // –£–±–∏—Ä–∞–µ–º –ø–æ–¥—Å–≤–µ—Ç–∫—É —Å–æ —Å—Ç–∞—Ä–æ–≥–æ
         if (slotUIs[selectedIndex] != null)
             slotUIs[selectedIndex].SetHighlight(false);
 
         selectedIndex = index;
 
-        // ¬ÍÎ˛˜‡ÂÏ ÔÓ‰Ò‚ÂÚÍÛ Ì‡ ÌÓ‚ÓÏ
+        // –í–∫–ª—é—á–∞–µ–º –ø–æ–¥—Å–≤–µ—Ç–∫—É –Ω–∞ –Ω–æ–≤–æ–º
         if (slotUIs[selectedIndex] != null)
             slotUIs[selectedIndex].SetHighlight(true);
     }
@@ -58,7 +82,7 @@ public class InventoryUI : MonoBehaviour
             slotUIs[i].Set(inventory.slots[i]);
     }
 
-    // ÃÂÚÓ‰, ˜ÚÓ·˚ ÙÓÌ‡ËÍ ÁÌ‡Î, ‚˚·‡Ì ÎË ÓÌ
+    // –ú–µ—Ç–æ–¥, —á—Ç–æ–±—ã —Ñ–æ–Ω–∞—Ä–∏–∫ –∑–Ω–∞–ª, –≤—ã–±—Ä–∞–Ω –ª–∏ –æ–Ω
     public ItemData GetSelectedItem()
     {
         if (inventory == null || slotUIs == null) return null;

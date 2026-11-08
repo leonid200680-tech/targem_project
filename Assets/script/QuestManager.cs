@@ -47,6 +47,11 @@ public class QuestManager : MonoBehaviour
     private bool ringStarted;
     private float playerReadyTime = -1f;
     private readonly System.Collections.Generic.List<GameObject> hiddenStones = new System.Collections.Generic.List<GameObject>();
+    private PickupItem bookPickup;
+    private bool npcHushDone;
+    private float nextFalseHush;
+    private readonly System.Collections.Generic.List<PickupItem> stonePickups = new System.Collections.Generic.List<PickupItem>();
+    private readonly System.Collections.Generic.List<(Vector3 pos, string number)> roomPlates = new System.Collections.Generic.List<(Vector3, string)>();
 
     void Awake()
     {
@@ -62,21 +67,87 @@ public class QuestManager : MonoBehaviour
         if (addict == null) addict = FindAnyObjectByType<NPCDialogueController>();
         if (pentagram == null) pentagram = FindAnyObjectByType<Pentagram>();
         candles = FindObjectsByType<CandleInteract>(FindObjectsInactive.Include);
-        if (questText != null) baseTextColor = questText.color;
+        if (questText != null)
+        {
+            baseTextColor = questText.color;
+            questText.verticalOverflow = VerticalWrapMode.Overflow;   // длинный текст не должен обрезаться
+        }
 
         // Камни для ритуала появляются только когда книга отдана сектанту
         foreach (var p in FindObjectsByType<PickupItem>(FindObjectsInactive.Include))
         {
+            if (p.item != null && addict != null && p.item == addict.ritualBook) bookPickup = p;
             if (p.item == null || p.item.type != ItemType.Stone) continue;
             if (pentagram != null && p.transform.IsChildOf(pentagram.transform)) continue;
             var root = p.transform;
             while (root.parent != null) root = root.parent;
+            if (!root.gameObject.activeSelf && !hiddenStones.Contains(root.gameObject)) continue;
+            stonePickups.Add(p);
             if (!root.gameObject.activeSelf) continue;
             root.gameObject.SetActive(false);
             hiddenStones.Add(root.gameObject);
         }
 
+        // Номера кабинетов запоминаем сразу: пугалка потом подменяет цифры на табличках
+        var plates = GameObject.Find("Room Numbers");
+        if (plates != null)
+            foreach (var t in plates.GetComponentsInChildren<TMPro.TMP_Text>(true))
+                roomPlates.Add((t.transform.position, t.text));
+
         SetStep(Step.AnswerPhone, false);
+    }
+
+    static int FloorOf(float y) => y < 5.8f ? 1 : y < 9.9f ? 2 : 3;
+
+    // Словами, где лежит предмет: этаж и ближайшая табличка кабинета на этом этаже
+    public string WhereIs(Vector3 p)
+    {
+        if (p.z > 5.2f || p.z < -15.8f || p.x < -34.5f || p.x > 26.8f) return "снаружи, у здания";
+        int floor = FloorOf(p.y);
+        string room = RoomNear(p);
+        return room != null ? $"{floor} этаж, у кабинета {room}" : $"{floor} этаж";
+    }
+
+    string RoomNear(Vector3 p)
+    {
+        int floor = FloorOf(p.y);
+        string room = null;
+        float best = float.MaxValue;
+        foreach (var (pos, number) in roomPlates)
+        {
+            if (FloorOf(pos.y) != floor) continue;
+            float d = (pos - p).sqrMagnitude;
+            if (d < best) { best = d; room = number; }
+        }
+        return room;
+    }
+
+    bool StoneLeft(PickupItem p) => p != null && p.gameObject.activeSelf;
+
+    // Подсказка сектанта: только про ненайденные камни. null - все найдены
+    public string StonesHint()
+    {
+        var places = new System.Collections.Generic.List<string>();
+        foreach (var p in stonePickups)
+            if (StoneLeft(p)) places.Add(WhereIs(p.transform.position));
+        return places.Count == 0 ? null : "Камни ещё лежат там: " + string.Join("; ", System.Linq.Enumerable.Distinct(places)) + ".";
+    }
+
+    string StonesByFloor()
+    {
+        var text = new System.Text.StringBuilder();
+        for (int f = 1; f <= 3; f++)
+        {
+            var rooms = new System.Collections.Generic.List<string>();
+            foreach (var p in stonePickups)
+                if (StoneLeft(p) && FloorOf(p.transform.position.y) == f)
+                {
+                    string room = RoomNear(p.transform.position);
+                    if (room != null && !rooms.Contains(room)) rooms.Add(room);
+                }
+            if (rooms.Count > 0) text.Append($"\n{f} этаж, у кабинетов: {string.Join(", ", rooms)}");
+        }
+        return text.Length > 0 ? text.ToString() : "\nВсе камни найдены: неси их к пентаграмме";
     }
 
     void Update()
@@ -99,7 +170,27 @@ public class QuestManager : MonoBehaviour
         for (int guard = 0; guard < 8 && IsCurrentStepComplete(); guard++)
             SetStep(currentStep + 1);
 
+        UpdateSilences();
         UpdateProgressText();
+    }
+
+    // Ложная тишина и затишье перед встречей с сектантом
+    void UpdateSilences()
+    {
+        if (currentStep == Step.SecondFloor && !npcHushDone && addict != null
+            && Mathf.Abs(player.transform.position.y - addict.transform.position.y) < 2.5f   // только на его этаже
+            && Vector3.Distance(player.transform.position, addict.transform.position) < 12f)
+        {
+            npcHushDone = true;
+            OutdoorSound.HushFor(5f);
+        }
+        if (currentStep < Step.ThirdFloor || currentStep >= Step.Done) return;
+        if (nextFalseHush <= 0f) nextFalseHush = Time.time + Random.Range(120f, 240f);
+        else if (Time.time >= nextFalseHush)
+        {
+            nextFalseHush = 0f;
+            OutdoorSound.HushFor(3.5f);
+        }
     }
 
     bool IsCurrentStepComplete()
@@ -173,7 +264,7 @@ public class QuestManager : MonoBehaviour
     {
         switch (step)
         {
-            case Step.AnswerPhone: return "Возьми телефон и ответь на звонок.";
+            case Step.AnswerPhone: return "Где-то рядом звонит телефон. Найди его и ответь.";
             case Step.WatchCameras: return "Телевизор барахлит. Включи его и проверь камеры";
             case Step.TakeItems: return "Забери фонарик и зажигалку";
             case Step.ThirdFloor: return "Посмотри, что творится на 3 этаже здания.";
@@ -194,8 +285,11 @@ public class QuestManager : MonoBehaviour
         switch (currentStep)
         {
             case Step.WatchCameras: return tv != null ? $" ({tv.CamerasSeen}/{tv.CameraCount})." : ".";
+            case Step.BringBook:
+                if (addict != null && HasItem(ItemType.Book)) return "\nКнига у тебя: неси её сектанту";
+                return bookPickup != null ? "\nКнига: " + WhereIs(bookPickup.transform.position) : "";
             case Step.TakeItems: return $" ({(HasItem(ItemType.Flashlight) ? 1 : 0) + (HasItem(ItemType.Lighter) ? 1 : 0)}/2).";
-            case Step.PlaceStones: return $" ({StonesPlaced()}/{StonesTotal()}).";
+            case Step.PlaceStones: return $" ({StonesPlaced()}/{StonesTotal()})." + StonesByFloor();
             case Step.LightCandles: return $" ({CandlesLit()}/{(candles != null ? candles.Length : 0)}).";
         }
         return "";
@@ -211,6 +305,7 @@ public class QuestManager : MonoBehaviour
     void SetStep(Step step, bool withEffect = true)
     {
         currentStep = step;
+        if (withEffect && (step == Step.SecondFloor || step == Step.PlaceDoll)) OutdoorSound.HushFor(4f);   // поднялся на 3 этаж, зажёг последнюю свечу
         if (step >= Step.PlaceStones)
         {
             foreach (var s in hiddenStones) if (s != null) s.SetActive(true);

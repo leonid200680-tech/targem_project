@@ -80,6 +80,10 @@ public class HallucinationManager : MonoBehaviour
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj == null) yield break;
 
+        // Всё стихает, и только потом удар
+        OutdoorSound.HushFor(3.5f);
+        yield return new WaitForSeconds(1.7f);
+
         // 1. СКРИМЕР: бабка бросается в лицо (3D), картинка - только запасной вариант
         if (realGhost != null && Camera.main != null)
         {

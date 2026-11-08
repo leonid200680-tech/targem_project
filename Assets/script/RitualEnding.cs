@@ -246,6 +246,7 @@ public class RitualEnding : MonoBehaviour
         {
             hm.realGhost.SetActive(false);
             granny = Instantiate(hm.realGhost);
+            foreach (var r in granny.GetComponentsInChildren<Renderer>(true)) r.enabled = true;   // на последнем этапе модель настоящей бабки скрыта
             foreach (var b in granny.GetComponentsInChildren<MonoBehaviour>(true)) Destroy(b);
             foreach (var a in granny.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true)) Destroy(a);
             granny.transform.SetPositionAndRotation(angela.transform.position, angela.transform.rotation);

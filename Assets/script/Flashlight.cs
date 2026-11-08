@@ -13,6 +13,8 @@ public class Flashlight : MonoBehaviour
     public float maxCharge = 60f;
     public float currentCharge = 60f;
     public float batteryRefill = 30f;
+    [Tooltip("Расход заряда в секунду")]
+    public float drainRate = 0.5f;
 
     private Inventory inventory;
     private bool isOn = false;
@@ -45,7 +47,7 @@ public class Flashlight : MonoBehaviour
         }
 
         // Включение по ЛКМ (как зажигалка) или по F
-        bool toggle = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.F);
+        bool toggle = BotInput.GetMouseButtonDown(0) || BotInput.GetKeyDown(KeyCode.F);
         if (toggle && isSelected && currentCharge > 0 && !PauseMenu.GameIsPaused && !DialogueManager.IsDialogueActive)
         {
             isOn = !isOn;
@@ -55,7 +57,7 @@ public class Flashlight : MonoBehaviour
         // Расход заряда
         if (isOn)
         {
-            currentCharge -= Time.deltaTime;
+            currentCharge -= Time.deltaTime * drainRate;
             if (currentCharge <= 0)
             {
                 currentCharge = 0;
@@ -66,7 +68,7 @@ public class Flashlight : MonoBehaviour
         }
 
         // Зарядка батарейкой
-        if (Input.GetKeyDown(KeyCode.R) && isSelected)
+        if (BotInput.GetKeyDown(KeyCode.R) && isSelected)
         {
             if (inventory.Has(batteryItem) && currentCharge < maxCharge)
             {
