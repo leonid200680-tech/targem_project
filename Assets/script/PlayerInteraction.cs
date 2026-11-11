@@ -37,8 +37,8 @@ public class PlayerInteraction : MonoBehaviour
             return;
         }
 
-        // Луч из центра экрана
-        Ray ray = cam.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        // Луч из центра взгляда (в VR - куда смотрит голова)
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
@@ -148,7 +148,7 @@ public class PlayerInteraction : MonoBehaviour
     {
         if (interactionText != null)
         {
-            interactionText.text = textToShow;
+            interactionText.text = VRSupport.Prompt(textToShow);
             interactionText.gameObject.SetActive(true);
         }
     }

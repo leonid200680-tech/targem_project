@@ -109,7 +109,7 @@ public class StudioSplash : MonoBehaviour
 
     void Update()
     {
-        if (Input.anyKeyDown || Input.GetMouseButtonDown(0)) skip = true;
+        if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || VRSupport.AnyDown) skip = true;
 
         // Зерно плёнки
         if (grain != null) grain.uvRect = new Rect(Random.value, Random.value, 2.5f, 1.4f);

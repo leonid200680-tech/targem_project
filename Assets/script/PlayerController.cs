@@ -74,6 +74,7 @@ public class PlayerController : MonoBehaviour
         float mouseY = BotInput.GetAxis("Mouse Y") * GameSettings.MouseSensitivity;
 
         transform.Rotate(Vector3.up * mouseX);
+        if (VRSupport.Active) return; // наклон головы задаёт шлем
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -107,7 +108,14 @@ public class PlayerController : MonoBehaviour
         currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
 
         float targetSpeed = isRunning ? runSpeed : walkSpeed;
-        Vector3 targetMove = (transform.right * x + transform.forward * z).normalized * targetSpeed;
+        // В VR идём туда, куда смотрит голова
+        Vector3 fwd = transform.forward, right = transform.right;
+        if (VRSupport.Active && cameraTransform != null)
+        {
+            fwd = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+            right = Vector3.Cross(Vector3.up, fwd);
+        }
+        Vector3 targetMove = (right * x + fwd * z).normalized * targetSpeed;
 
         float rate = targetMove.sqrMagnitude < currentMoveVelocity.sqrMagnitude ? deceleration : acceleration;
         currentMoveVelocity = Vector3.MoveTowards(currentMoveVelocity, targetMove, rate * Time.deltaTime);
@@ -164,7 +172,7 @@ public class PlayerController : MonoBehaviour
 
     void HandleHeadBob()
     {
-        if (cameraTransform == null) return;
+        if (cameraTransform == null || VRSupport.Active) return; // в VR качание камеры укачивает
 
         if (controller.isGrounded && currentMoveVelocity.magnitude > 0.1f)
         {

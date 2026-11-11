@@ -27,35 +27,49 @@ public static class BotInput
 
     static bool BotDown(KeyCode key) => pressed.TryGetValue(key, out int f) && f == Time.frameCount;
 
-    public static bool GetKeyDown(KeyCode key) => Active ? BotDown(key) : Input.GetKeyDown(key);
+    // В VR кнопки контроллеров приходят как те же клавиши (см. VRSupport)
+    public static bool GetKeyDown(KeyCode key) => Active ? BotDown(key) : Input.GetKeyDown(key) || VRSupport.KeyDown(key);
 
     public static bool GetMouseButtonDown(int button) =>
-        Active ? BotDown(KeyCode.Mouse0 + button) : Input.GetMouseButtonDown(button);
+        Active ? BotDown(KeyCode.Mouse0 + button) : Input.GetMouseButtonDown(button) || VRSupport.KeyDown(KeyCode.Mouse0 + button);
 
     public static bool GetKey(KeyCode key)
     {
-        if (!Active) return Input.GetKey(key);
+        if (!Active) return Input.GetKey(key) || (key == KeyCode.LeftShift && VRSupport.Run);
         return (key == KeyCode.LeftShift && Run) || BotDown(key);
     }
 
-    public static bool GetButtonDown(string button) => Active ? button == "Jump" && BotDown(KeyCode.Space) : Input.GetButtonDown(button);
+    public static bool GetButtonDown(string button) => Active ? button == "Jump" && BotDown(KeyCode.Space)
+        : Input.GetButtonDown(button) || (button == "Jump" && VRSupport.KeyDown(KeyCode.Space));
 
     public static float GetAxisRaw(string axis)
     {
-        if (!Active) return Input.GetAxisRaw(axis);
+        if (!Active) return Mathf.Clamp(Input.GetAxisRaw(axis) + VRAxis(axis), -1f, 1f);
         return axis == "Horizontal" ? Mathf.Round(Move.x) : axis == "Vertical" ? Mathf.Round(Move.y) : 0f;
     }
 
     public static float GetAxis(string axis)
     {
-        if (!Active) return Input.GetAxis(axis);
         float sens = Mathf.Max(0.01f, GameSettings.MouseSensitivity);
+        if (!Active) return Input.GetAxis(axis) + VRAxis(axis) + (axis == "Mouse X" ? VRSupport.TurnDegrees / sens : 0f);
         switch (axis)
         {
             case "Mouse X": return Look.x / sens;
             case "Mouse Y": return Look.y / sens;
             case "Horizontal": return Move.x;
             case "Vertical": return Move.y;
+        }
+        return 0f;
+    }
+
+    static float VRAxis(string axis)
+    {
+        if (!VRSupport.Active) return 0f;
+        switch (axis)
+        {
+            case "Horizontal": return VRSupport.Move.x;
+            case "Vertical": return VRSupport.Move.y;
+            case "Mouse ScrollWheel": return VRSupport.Scroll * 0.1f;
         }
         return 0f;
     }
