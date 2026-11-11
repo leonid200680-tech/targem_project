@@ -16,7 +16,7 @@
 .DS_Store
 Thumbs.db
 
-# Claude Code (local settings)
+# Local settings
 .mcp.json
 
 # Записанные трейлеры (большие видео)
