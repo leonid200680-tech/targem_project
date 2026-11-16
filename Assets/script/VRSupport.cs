@@ -2,16 +2,20 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
 using UnityEngine.XR;
+using XRCommonUsages = UnityEngine.XR.CommonUsages;
 
-// VR-режим (шлем через OpenXR). Если шлема нет, скрипт ничего не делает, и игра идёт с клавиатуры и мыши.
-// Игровую логику не переписываем:
+// VR-режим (шлем через OpenXR: SteamVR, Meta Link). Если шлема нет, скрипт ничего не делает,
+// и игра идёт с клавиатуры и мыши. Игровую логику не переписываем:
 //  - контроллеры "жмут" те же клавиши через BotInput (A = E, курок = ЛКМ и т.д.);
 //  - голова шлема крутит и двигает игровую камеру, тело игрока поворачивается рывками правым стиком;
 //  - предметы в руках (фонарик, зажигалка, бутылка) переезжают в правую руку, фонарик светит туда, куда она указывает;
 //  - экранные меню и HUD становятся панелью перед глазами, по кнопкам меню жмут лучом из руки (курком).
+// Контроллеры читаем через Input System (основной путь OpenXR), старый XR API - запасной.
+// Если руки не отслеживаются, они висят перед игроком, чтобы фонарик всё равно был виден и светил.
 [DefaultExecutionOrder(-10000)]
 public class VRSupport : MonoBehaviour
 {
@@ -27,7 +31,9 @@ public class VRSupport : MonoBehaviour
     public static bool AnyDown => Active && down.Count > 0;
 
     const float SnapAngle = 30f;
-    const float UiDistance = 1.6f, UiWidth = 2f;  // HUD: панель 2 м шириной в 1,6 м перед глазами
+    // HUD: панель 0,9 м шириной в 0,7 м перед глазами (около 65 градусов обзора).
+    // Ближе стен вагончика и коридоров, иначе меню проваливается в стену
+    const float UiDistance = 0.7f, UiWidth = 0.9f;
     const float MaxLean = 0.3f;                    // насколько голова может уйти от тела (наклон), м
 
     // Голова и руки в пространстве трекинга
@@ -36,7 +42,7 @@ public class VRSupport : MonoBehaviour
     Transform space, leftHand, rightHand, uiAnchor;
     LineRenderer laser;
 
-    // Игрок
+    // Игрок текущей сцены
     PlayerController player;
     Transform playerCam;
     Vector3 eyeLocal;
@@ -49,34 +55,111 @@ public class VRSupport : MonoBehaviour
     readonly HashSet<Canvas> converted = new HashSet<Canvas>();
     float nextCanvasScan;
 
+    // Действия контроллеров (Input System)
+    class Hand
+    {
+        public InputAction pos, rot, tracked;
+        public Hand(string side)
+        {
+            pos = Act(InputActionType.Value, $"<XRController>{{{side}}}/devicePosition");
+            rot = Act(InputActionType.Value, $"<XRController>{{{side}}}/deviceRotation");
+            tracked = Act(InputActionType.Button, $"<XRController>{{{side}}}/isTracked");
+        }
+    }
+    Hand inL, inR;
+    InputAction moveAct, turnAct, runAct, recenterAct;
+    readonly List<(InputAction act, KeyCode key)> buttons = new List<(InputAction, KeyCode)>();
+
+    static InputAction Act(InputActionType type, params string[] paths)
+    {
+        var a = new InputAction(type: type);
+        foreach (var p in paths) a.AddBinding(p);
+        a.Enable();
+        return a;
+    }
+    static string L(string usage) => "<XRController>{LeftHand}/{" + usage + "}";
+    static string R(string usage) => "<XRController>{RightHand}/{" + usage + "}";
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Boot() => new GameObject("VR Support").AddComponent<VRSupport>();
+    static void Boot()
+    {
+        var go = new GameObject("VR Support");
+        DontDestroyOnLoad(go); // перезапуск уровня из паузы не должен выключать VR
+        go.AddComponent<VRSupport>();
+    }
 
     IEnumerator Start()
     {
-        // OpenXR поднимает шлем в первые кадры; ждём до 3 секунд
-        for (float t = 0; t < 3f && !XRSettings.isDeviceActive; t += Time.unscaledDeltaTime) yield return null;
+        // OpenXR поднимает шлем в первые кадры; ждём до 5 секунд
+        for (float t = 0; t < 5f && !XRSettings.isDeviceActive; t += Time.unscaledDeltaTime) yield return null;
         if (!XRSettings.isDeviceActive) { Destroy(gameObject); yield break; }
 
         Active = true;
+        // Окно игры на мониторе часто без фокуса (игрок в шлеме) - ввод всё равно нужен
+        InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+        Application.runInBackground = true;
+
         var inputs = new List<XRInputSubsystem>();
         SubsystemManager.GetSubsystems(inputs);
         foreach (var s in inputs) s.TrySetTrackingOriginMode(TrackingOriginModeFlags.Device);
 
+        inL = new Hand("LeftHand");
+        inR = new Hand("RightHand");
+        moveAct = Act(InputActionType.Value, L("Primary2DAxis"));
+        turnAct = Act(InputActionType.Value, R("Primary2DAxis"));
+        runAct = Act(InputActionType.Button, L("GripButton"));
+        recenterAct = Act(InputActionType.Button, L("Primary2DAxisClick"));
+        buttons.Add((Act(InputActionType.Button, R("TriggerButton")), KeyCode.Mouse0));      // фонарик, бросок, зажигалка, далее в диалоге
+        buttons.Add((Act(InputActionType.Button, R("PrimaryButton"), R("MenuButton")), KeyCode.E)); // A (на Vive - меню) - взаимодействовать
+        buttons.Add((Act(InputActionType.Button, R("SecondaryButton")), KeyCode.R));        // B - сменить батарейку
+        buttons.Add((Act(InputActionType.Button, R("Primary2DAxisClick")), KeyCode.Space)); // клик правым стиком - прыжок
+        buttons.Add((Act(InputActionType.Button, L("TriggerButton")), KeyCode.F));          // левый курок - фонарик
+        buttons.Add((Act(InputActionType.Button, L("PrimaryButton")), KeyCode.G));          // X - выбросить предмет
+        buttons.Add((Act(InputActionType.Button, L("SecondaryButton"), L("MenuButton")), KeyCode.Escape)); // Y / меню - пауза
+
         space = new GameObject("VR Tracking Space").transform;
+        space.SetParent(transform, false);
         leftHand = MakeHand("Left Hand");
         rightHand = MakeHand("Right Hand");
-        uiAnchor = new GameObject("VR UI").transform;
 
         laser = rightHand.gameObject.AddComponent<LineRenderer>();
         laser.useWorldSpace = false;
         laser.positionCount = 2;
         laser.SetPositions(new[] { Vector3.zero, Vector3.forward * 3f });
         laser.widthMultiplier = 0.004f;
-        var laserShader = Shader.Find("HDRP/Unlit") ?? Shader.Find("Sprites/Default");
-        laser.material = new Material(laserShader);
-        laser.material.SetColor("_UnlitColor", new Color(1f, 0.2f, 0.15f));
+        laser.material = Mat(new Color(1f, 0.2f, 0.15f), unlit: true);
         laser.startColor = laser.endColor = new Color(1f, 0.2f, 0.15f);
+
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        SetupScene();
+
+        Application.onBeforeRender += BeforeRender;
+        StartCoroutine(RestoreAfterFrame());
+        Debug.Log("[VR] Шлем найден, VR-режим включён");
+    }
+
+    void OnDestroy()
+    {
+        if (!Active) return;
+        Application.onBeforeRender -= BeforeRender;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        Active = false;
+    }
+
+    void OnSceneLoaded(Scene s, LoadSceneMode mode) => SetupScene();
+
+    // Всё, что привязано к сцене: игрок, панель интерфейса, предметы в руке
+    void SetupScene()
+    {
+        // Предметы из прошлой сцены (их holder'ы жили в руке) уничтожаем
+        foreach (var hand in new[] { leftHand, rightHand })
+            foreach (Transform c in hand.Cast<Transform>().ToList())
+                if (c.name != "Controller") Destroy(c.gameObject);
+        converted.Clear();
+        handsMoved = false;
+        player = null; playerCam = null;
+
+        uiAnchor = new GameObject("VR UI").transform; // живёт в сцене: вместе с ней уйдут и её меню
 
         var players = FindObjectsByType<PlayerController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         if (players.Length > 0 && players[0].cameraTransform != null)
@@ -88,28 +171,39 @@ public class VRSupport : MonoBehaviour
 
         var module = FindFirstObjectByType<InputSystemUIInputModule>();
         if (module != null) module.xrTrackingOrigin = space;
-
-        Application.onBeforeRender += BeforeRender;
-        StartCoroutine(RestoreAfterFrame());
-        Debug.Log("[VR] Шлем найден, VR-режим включён");
     }
 
-    void OnDestroy()
+    // Материал под HDRP: стандартный материал примитивов в билде HDRP не рисуется
+    static Material Mat(Color c, bool unlit)
     {
-        if (!Active) return;
-        Application.onBeforeRender -= BeforeRender;
-        Active = false;
+        var sh = Shader.Find(unlit ? "HDRP/Unlit" : "HDRP/Lit") ?? Shader.Find("HDRP/Lit") ?? Shader.Find("Sprites/Default");
+        var m = new Material(sh);
+        if (m.HasProperty("_UnlitColor")) m.SetColor("_UnlitColor", c);
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+        m.color = c;
+        return m;
     }
 
     Transform MakeHand(string name)
     {
         var hand = new GameObject(name).transform;
         hand.SetParent(space, false);
-        var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        Destroy(ball.GetComponent<Collider>());
-        ball.name = "Controller";
-        ball.transform.SetParent(hand, false);
-        ball.transform.localScale = new Vector3(0.05f, 0.05f, 0.09f);
+        // Простая модель контроллера: рукоять + кольцо-подсветка, чтобы руку было видно в темноте
+        var grip = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        Destroy(grip.GetComponent<Collider>());
+        grip.name = "Controller";
+        grip.transform.SetParent(hand, false);
+        grip.transform.localScale = new Vector3(0.04f, 0.06f, 0.04f);
+        grip.transform.localRotation = Quaternion.Euler(70f, 0f, 0f);
+        grip.transform.localPosition = new Vector3(0f, -0.01f, -0.03f);
+        grip.GetComponent<Renderer>().sharedMaterial = Mat(new Color(0.12f, 0.12f, 0.13f), unlit: false);
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(ring.GetComponent<Collider>());
+        ring.name = "Glow";
+        ring.transform.SetParent(grip.transform, false);
+        ring.transform.localScale = new Vector3(0.6f, 0.15f, 0.6f);
+        ring.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+        ring.GetComponent<Renderer>().sharedMaterial = Mat(new Color(0.6f, 0.08f, 0.05f), unlit: true);
         return hand;
     }
 
@@ -121,40 +215,46 @@ public class VRSupport : MonoBehaviour
         down.Clear();
         TurnDegrees = 0f; Scroll = 0f;
 
-        var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+        ReadHead();
+        if (!hasOrigin && (hmdPos != Vector3.zero || hmdRot != Quaternion.identity)) Recenter();
+
+        Vector2 ls = moveAct.ReadValue<Vector2>(), rs = turnAct.ReadValue<Vector2>();
+        bool run = runAct.IsPressed();
+        // Запасной путь: старый XR API (если Input System не увидел контроллер)
         var l = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
         var r = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
-
-        if (head.TryGetFeatureValue(CommonUsages.centerEyePosition, out var p) || head.TryGetFeatureValue(CommonUsages.devicePosition, out p)) hmdPos = p;
-        if (head.TryGetFeatureValue(CommonUsages.centerEyeRotation, out var q) || head.TryGetFeatureValue(CommonUsages.deviceRotation, out q)) hmdRot = q;
-        if (!hasOrigin && head.isValid) Recenter();
-
-        l.TryGetFeatureValue(CommonUsages.primary2DAxis, out var ls);
-        r.TryGetFeatureValue(CommonUsages.primary2DAxis, out var rs);
+        if (ls == Vector2.zero) l.TryGetFeatureValue(XRCommonUsages.primary2DAxis, out ls);
+        if (rs == Vector2.zero) r.TryGetFeatureValue(XRCommonUsages.primary2DAxis, out rs);
+        if (!run) l.TryGetFeatureValue(XRCommonUsages.gripButton, out run);
         Move = ls.magnitude > 0.2f ? ls : Vector2.zero;
-        l.TryGetFeatureValue(CommonUsages.gripButton, out Run);
+        Run = run;
 
-        Button(r, CommonUsages.triggerButton, KeyCode.Mouse0);    // фонарик, бросок, зажигалка, далее в диалоге
-        Button(r, CommonUsages.primaryButton, KeyCode.E);         // A - взаимодействовать
-        Button(r, CommonUsages.secondaryButton, KeyCode.R);       // B - сменить батарейку
-        Button(r, CommonUsages.primary2DAxisClick, KeyCode.Space); // клик правым стиком - прыжок
-        Button(l, CommonUsages.triggerButton, KeyCode.F);         // левый курок - фонарик
-        Button(l, CommonUsages.primaryButton, KeyCode.G);         // X - выбросить предмет
-        Button(l, CommonUsages.secondaryButton, KeyCode.Escape);  // Y - пауза
-        Button(l, CommonUsages.menuButton, KeyCode.Escape);
+        foreach (var (act, key) in buttons) if (act.WasPressedThisFrame()) down.Add(key);
+        // Старый API - только если Input System контроллеров не видит, иначе одно нажатие сработало бы дважды
+        bool seen = inL.pos.controls.Count > 0 || inR.pos.controls.Count > 0;
+        if (seen) l = r = default;
+        Legacy(r, XRCommonUsages.triggerButton, KeyCode.Mouse0);
+        Legacy(r, XRCommonUsages.primaryButton, KeyCode.E);
+        Legacy(r, XRCommonUsages.secondaryButton, KeyCode.R);
+        Legacy(r, XRCommonUsages.primary2DAxisClick, KeyCode.Space);
+        Legacy(l, XRCommonUsages.triggerButton, KeyCode.F);
+        Legacy(l, XRCommonUsages.primaryButton, KeyCode.G);
+        Legacy(l, XRCommonUsages.secondaryButton, KeyCode.Escape);
+        Legacy(l, XRCommonUsages.menuButton, KeyCode.Escape);
 
         // Правый стик: рывок влево/вправо поворачивает тело (и листает камеры на мониторе), вверх/вниз - слоты
         if (Flick("rx+", rs.x)) { TurnDegrees += SnapAngle; down.Add(KeyCode.RightArrow); }
         if (Flick("rx-", -rs.x)) { TurnDegrees -= SnapAngle; down.Add(KeyCode.LeftArrow); }
         if (Flick("ry+", rs.y)) Scroll = 1f;
         if (Flick("ry-", -rs.y)) Scroll = -1f;
-        if (Flick("ls", l.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out bool lc) && lc ? 1f : 0f)) Recenter();
+        if (recenterAct.WasPressedThisFrame()) Recenter();
 
         if (Time.unscaledTime >= nextCanvasScan) { nextCanvasScan = Time.unscaledTime + 0.1f; ConvertCanvases(); }
     }
 
-    void Button(InputDevice dev, InputFeatureUsage<bool> usage, KeyCode key)
+    void Legacy(UnityEngine.XR.InputDevice dev, InputFeatureUsage<bool> usage, KeyCode key)
     {
+        if (!dev.isValid) return;
         dev.TryGetFeatureValue(usage, out bool on);
         string id = dev.characteristics + usage.name;
         prev.TryGetValue(id, out bool was);
@@ -168,6 +268,13 @@ public class VRSupport : MonoBehaviour
         bool on = was ? v > 0.3f : v > 0.7f;
         prev[id] = on;
         return on && !was;
+    }
+
+    void ReadHead()
+    {
+        var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+        if (head.TryGetFeatureValue(XRCommonUsages.centerEyePosition, out var p) || head.TryGetFeatureValue(XRCommonUsages.devicePosition, out p)) hmdPos = p;
+        if (head.TryGetFeatureValue(XRCommonUsages.centerEyeRotation, out var q) || head.TryGetFeatureValue(XRCommonUsages.deviceRotation, out q)) hmdRot = q;
     }
 
     void Recenter()
@@ -189,9 +296,7 @@ public class VRSupport : MonoBehaviour
     void BeforeRender()
     {
         if (!Active) return;
-        var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
-        if (head.TryGetFeatureValue(CommonUsages.centerEyePosition, out var p)) hmdPos = p;
-        if (head.TryGetFeatureValue(CommonUsages.centerEyeRotation, out var q)) hmdRot = q;
+        ReadHead();
         ApplyPose();
     }
 
@@ -222,8 +327,8 @@ public class VRSupport : MonoBehaviour
         space.position = basePos - space.rotation * originPos;
         cam.transform.SetPositionAndRotation(space.TransformPoint(hmdPos), space.rotation * hmdRot);
 
-        PoseHand(XRNode.LeftHand, leftHand);
-        PoseHand(XRNode.RightHand, rightHand);
+        PoseHand(inL, XRNode.LeftHand, leftHand, -1f);
+        PoseHand(inR, XRNode.RightHand, rightHand, 1f);
         if (isPlayer) MoveHeldItems();
         UpdateUi(cam);
     }
@@ -249,15 +354,40 @@ public class VRSupport : MonoBehaviour
         while (true) { yield return wait; RestoreBorrowed(); }
     }
 
-    void PoseHand(XRNode node, Transform hand)
+    void PoseHand(Hand input, XRNode node, Transform hand, float side)
     {
+        // 1) Input System (OpenXR). Контроллеров одной руки может быть несколько (разные профили) -
+        //    берём первый, у которого есть живая поза
+        foreach (var c in input.pos.controls)
+        {
+            if (!(c is UnityEngine.InputSystem.Controls.Vector3Control pc)) continue;
+            Vector3 p = pc.ReadValue();
+            if (p == Vector3.zero) continue;
+            var rc = c.device.TryGetChildControl<UnityEngine.InputSystem.Controls.QuaternionControl>("deviceRotation");
+            hand.localPosition = p;
+            hand.localRotation = rc != null ? Normalize(rc.ReadValue()) : Quaternion.identity;
+            return;
+        }
+        // 2) Старый XR API
         var dev = InputDevices.GetDeviceAtXRNode(node);
-        bool ok = dev.TryGetFeatureValue(CommonUsages.devicePosition, out var p) & dev.TryGetFeatureValue(CommonUsages.deviceRotation, out var q);
-        hand.gameObject.SetActive(ok);
-        if (ok) { hand.localPosition = p; hand.localRotation = q; }
+        if (dev.isValid && dev.TryGetFeatureValue(XRCommonUsages.devicePosition, out var lp) && dev.TryGetFeatureValue(XRCommonUsages.deviceRotation, out var lq) && lp != Vector3.zero)
+        {
+            hand.localPosition = lp; hand.localRotation = lq;
+            return;
+        }
+        // 3) Контроллер не отслеживается: рука перед игроком у пояса, смотрит туда же, куда голова
+        Quaternion headYaw = Quaternion.Euler(0f, hmdRot.eulerAngles.y, 0f);
+        hand.localPosition = hmdPos + headYaw * new Vector3(0.18f * side, -0.25f, 0.4f);
+        hand.localRotation = hmdRot;
     }
 
-    // Фонарик, зажигалка и бутылка переезжают из-под камеры в правую руку (один раз)
+    static Quaternion Normalize(Quaternion q)
+    {
+        float m = Mathf.Sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+        return m > 1e-4f ? new Quaternion(q.x / m, q.y / m, q.z / m, q.w / m) : Quaternion.identity;
+    }
+
+    // Фонарик, зажигалка и бутылка переезжают из-под камеры в правую руку (один раз на сцену)
     void MoveHeldItems()
     {
         var ik = player.GetComponentInChildren<PlayerHandsIK>(true);
@@ -269,17 +399,17 @@ public class VRSupport : MonoBehaviour
                 ik.enabled = false; // рука модели больше не держит предметы: их держит контроллер
                 foreach (var r in ik.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             }
-            foreach (Transform holder in new List<Transform>(playerCam.Cast<Transform>()))
+            foreach (Transform holder in playerCam.Cast<Transform>().ToList())
             {
                 if (!holder.name.EndsWith("Holder") || holder.childCount == 0) continue;
                 Transform item = holder.GetChild(0);
                 Vector3 axis = Vector3.forward;
                 if (ik != null) foreach (var it in ik.items) if (it.item == item) axis = it.longAxisLocal;
-                holder.SetParent(rightHand, false);
+                holder.SetParent(rightHand, true); // true: сохранить мировой размер (у игрока свой масштаб)
                 holder.localPosition = Vector3.zero; holder.localRotation = Quaternion.identity;
                 // Длинная ось предмета (стекло фонарика, верх зажигалки) - вдоль руки, сам предмет - в ладони
                 item.rotation = Quaternion.FromToRotation(item.rotation * axis, rightHand.forward) * item.rotation;
-                item.position = rightHand.position;
+                item.position = rightHand.position + rightHand.forward * 0.04f;
             }
         }
         // Свет фонарика бьёт туда, куда указывает рука
@@ -293,6 +423,7 @@ public class VRSupport : MonoBehaviour
         foreach (var c in FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (!c.isRootCanvas || converted.Contains(c) || c.renderMode == RenderMode.WorldSpace) continue;
+            if (c.gameObject.scene.name == null || c.gameObject.scene.name == "DontDestroyOnLoad") continue;
             converted.Add(c);
             var scaler = c.GetComponent<UnityEngine.UI.CanvasScaler>();
             Vector2 size = scaler != null && scaler.uiScaleMode == UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize
