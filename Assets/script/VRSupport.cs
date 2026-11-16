@@ -41,6 +41,10 @@ public class VRSupport : MonoBehaviour
     Vector3 originPos; Quaternion originYaw = Quaternion.identity; bool hasOrigin;
     Transform space, leftHand, rightHand, uiAnchor;
     LineRenderer laser;
+    GameObject dot;                 // точка, куда упирается луч
+    InputAction clickAct;           // курок любой руки - нажать кнопку меню
+    UnityEngine.UI.Selectable hovered;
+    UnityEngine.UI.Slider dragged;
 
     // Игрок текущей сцены
     PlayerController player;
@@ -126,9 +130,23 @@ public class VRSupport : MonoBehaviour
         laser.useWorldSpace = false;
         laser.positionCount = 2;
         laser.SetPositions(new[] { Vector3.zero, Vector3.forward * 3f });
-        laser.widthMultiplier = 0.004f;
+        laser.widthMultiplier = 0.006f;
         laser.material = Mat(new Color(1f, 0.2f, 0.15f), unlit: true);
         laser.startColor = laser.endColor = new Color(1f, 0.2f, 0.15f);
+        dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(dot.GetComponent<Collider>());
+        dot.name = "Pointer Dot";
+        dot.transform.SetParent(transform, false);
+        dot.transform.localScale = Vector3.one * 0.012f;
+        dot.GetComponent<Renderer>().sharedMaterial = Mat(new Color(1f, 0.85f, 0.7f), unlit: true);
+        dot.SetActive(false);
+        clickAct = Act(InputActionType.Button, R("TriggerButton"), L("TriggerButton"));
+
+        // Камера главного меню рисует только слой UI: руки, луч и точку кладём туда же, иначе в меню их не видно
+        int uiLayer = LayerMask.NameToLayer("UI");
+        if (uiLayer >= 0)
+            foreach (var t in new[] { leftHand, rightHand, dot.transform })
+                foreach (var c in t.GetComponentsInChildren<Transform>(true)) c.gameObject.layer = uiLayer;
 
         SceneManager.sceneLoaded += OnSceneLoaded;
         SetupScene();
@@ -156,6 +174,7 @@ public class VRSupport : MonoBehaviour
             foreach (Transform c in hand.Cast<Transform>().ToList())
                 if (c.name != "Controller") Destroy(c.gameObject);
         converted.Clear();
+        hovered = null; dragged = null;
         handsMoved = false;
         player = null; playerCam = null;
 
@@ -170,7 +189,18 @@ public class VRSupport : MonoBehaviour
         }
 
         var module = FindFirstObjectByType<InputSystemUIInputModule>();
-        if (module != null) module.xrTrackingOrigin = space;
+        if (module != null)
+        {
+            // Меню в VR жмёт наш луч (UpdatePointer). Стандартный модуль UI от контроллеров отключаем,
+            // иначе курок нажимал бы ещё и то, что под мышью на мониторе, или кнопку дважды
+            module.xrTrackingOrigin = space;
+            module.trackedDevicePosition = null;
+            module.trackedDeviceOrientation = null;
+            var click = module.leftClick != null ? module.leftClick.action : null;
+            if (click != null)
+                for (int i = 0; i < click.bindings.Count; i++)
+                    if (click.bindings[i].path.Contains("XRController")) click.ApplyBindingOverride(i, "");
+        }
     }
 
     // Материал под HDRP: стандартный материал примитивов в билде HDRP не рисуется
@@ -229,7 +259,7 @@ public class VRSupport : MonoBehaviour
         Move = ls.magnitude > 0.2f ? ls : Vector2.zero;
         Run = run;
 
-        foreach (var (act, key) in buttons) if (act.WasPressedThisFrame()) down.Add(key);
+        for (int i = 0; i < buttons.Count; i++) if (Pressed(buttons[i].act, "b" + i)) down.Add(buttons[i].key);
         // Старый API - только если Input System контроллеров не видит, иначе одно нажатие сработало бы дважды
         bool seen = inL.pos.controls.Count > 0 || inR.pos.controls.Count > 0;
         if (seen) l = r = default;
@@ -247,7 +277,7 @@ public class VRSupport : MonoBehaviour
         if (Flick("rx-", -rs.x)) { TurnDegrees -= SnapAngle; down.Add(KeyCode.LeftArrow); }
         if (Flick("ry+", rs.y)) Scroll = 1f;
         if (Flick("ry-", -rs.y)) Scroll = -1f;
-        if (recenterAct.WasPressedThisFrame()) Recenter();
+        if (Pressed(recenterAct, "recenter")) Recenter();
 
         if (Time.unscaledTime >= nextCanvasScan) { nextCanvasScan = Time.unscaledTime + 0.1f; ConvertCanvases(); }
     }
@@ -260,6 +290,16 @@ public class VRSupport : MonoBehaviour
         prev.TryGetValue(id, out bool was);
         prev[id] = on;
         if (on && !was) down.Add(key);
+    }
+
+    // Момент нажатия ловим сами по IsPressed: WasPressedThisFrame теряет нажатие, если ввод
+    // обработан в другом цикле обновления (окно без фокуса, редактор)
+    bool Pressed(InputAction a, string id)
+    {
+        bool on = a.IsPressed();
+        prev.TryGetValue(id, out bool was);
+        prev[id] = on;
+        return on && !was;
     }
 
     bool Flick(string id, float v)
@@ -291,6 +331,7 @@ public class VRSupport : MonoBehaviour
         if (!Active) return;
         RestoreBorrowed();
         ApplyPose();
+        UpdatePointer(); // только здесь, раз за кадр: иначе одно нажатие курка сработало бы дважды
     }
 
     void BeforeRender()
@@ -308,6 +349,8 @@ public class VRSupport : MonoBehaviour
 
         Camera cam = ViewCamera();
         if (cam == null) return;
+        // Руки и луч в 20-40 см от глаз: камера меню с отсечением 0,3 м их бы обрезала
+        if (cam.nearClipPlane > 0.05f) cam.nearClipPlane = 0.05f;
 
         Vector3 basePos; Quaternion yaw;
         bool isPlayer = playerCam != null && cam.transform == playerCam;
@@ -449,9 +492,79 @@ public class VRSupport : MonoBehaviour
         Quaternion want = Quaternion.LookRotation(fwd.normalized);
         uiAnchor.rotation = Quaternion.Slerp(uiAnchor.rotation, want, 1f - Mathf.Exp(-4f * Time.unscaledDeltaTime));
         uiAnchor.position = h.position + uiAnchor.forward * UiDistance;
+    }
 
-        // Луч для меню виден, только когда игре нужен курсор
-        laser.enabled = Cursor.visible || player == null || !player.gameObject.activeInHierarchy;
+    // ---------- Луч-указатель для меню ----------
+    // Луч из правой руки; кнопка под ним подсвечивается, курок (любой руки) её нажимает,
+    // слайдер (громкость, чувствительность) тянется, пока курок зажат.
+    void UpdatePointer()
+    {
+        // Меню открыто, когда игре нужен курсор: главное меню, пауза, настройки, финальные экраны
+        bool menu = Cursor.visible || PauseMenu.GameIsPaused || player == null || !player.gameObject.activeInHierarchy;
+        laser.enabled = menu;
+        dot.SetActive(false);
+        if (!menu) { SetHover(null); dragged = null; return; }
+
+        var ray = new Ray(rightHand.position, rightHand.forward);
+        UnityEngine.UI.Selectable best = null;
+        float bestDist = 5f;
+        Vector3 bestHit = Vector3.zero;
+        float wallDist = 5f; // если луч упёрся в панель без кнопок - точка на панели
+        foreach (var c in converted)
+        {
+            if (c == null || !c.isActiveAndEnabled) continue;
+            if (!new Plane(c.transform.forward, c.transform.position).Raycast(ray, out float d) || d > bestDist + 0.01f) continue;
+            Vector3 hit = ray.GetPoint(d);
+            var crt = (RectTransform)c.transform;
+            if (crt.rect.Contains((Vector2)crt.InverseTransformPoint(hit))) wallDist = Mathf.Min(wallDist, d);
+            foreach (var s in c.GetComponentsInChildren<UnityEngine.UI.Selectable>())
+            {
+                if (!s.IsInteractable() || !s.isActiveAndEnabled) continue;
+                var rt = (RectTransform)s.transform;
+                if (!rt.rect.Contains((Vector2)rt.InverseTransformPoint(hit))) continue;
+                // позже в иерархии = нарисовано поверх: при равной дальности берём его
+                if (best == null || d <= bestDist + 0.001f) { best = s; bestDist = d; bestHit = hit; }
+            }
+        }
+
+        float len = best != null ? bestDist : wallDist < 5f ? wallDist : 3f;
+        laser.SetPosition(1, Vector3.forward * len);
+        if (best != null || wallDist < 5f)
+        {
+            dot.SetActive(true);
+            dot.transform.position = best != null ? bestHit : ray.GetPoint(wallDist);
+        }
+
+        if (dragged == null) SetHover(best);
+        if (Pressed(clickAct, "click") && best != null)
+        {
+            if (best is UnityEngine.UI.Slider sl) dragged = sl;
+            else UnityEngine.EventSystems.ExecuteEvents.Execute(best.gameObject, Ped(), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+        }
+        if (!clickAct.IsPressed()) dragged = null;
+        if (dragged != null)
+        {
+            var rt = (RectTransform)dragged.transform;
+            if (new Plane(rt.forward, rt.position).Raycast(ray, out float d))
+            {
+                Vector2 local = rt.InverseTransformPoint(ray.GetPoint(d));
+                bool horizontal = dragged.direction == UnityEngine.UI.Slider.Direction.LeftToRight || dragged.direction == UnityEngine.UI.Slider.Direction.RightToLeft;
+                float t = horizontal ? Mathf.InverseLerp(rt.rect.xMin, rt.rect.xMax, local.x) : Mathf.InverseLerp(rt.rect.yMin, rt.rect.yMax, local.y);
+                if (dragged.direction == UnityEngine.UI.Slider.Direction.RightToLeft || dragged.direction == UnityEngine.UI.Slider.Direction.TopToBottom) t = 1f - t;
+                dragged.normalizedValue = t;
+            }
+        }
+    }
+
+    UnityEngine.EventSystems.PointerEventData Ped() =>
+        new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { button = UnityEngine.EventSystems.PointerEventData.InputButton.Left };
+
+    void SetHover(UnityEngine.UI.Selectable s)
+    {
+        if (s == hovered) return;
+        if (hovered != null) UnityEngine.EventSystems.ExecuteEvents.Execute(hovered.gameObject, Ped(), UnityEngine.EventSystems.ExecuteEvents.pointerExitHandler);
+        hovered = s;
+        if (s != null) UnityEngine.EventSystems.ExecuteEvents.Execute(s.gameObject, Ped(), UnityEngine.EventSystems.ExecuteEvents.pointerEnterHandler);
     }
 
     // Подсказки "Нажмите E" -> кнопки контроллера
