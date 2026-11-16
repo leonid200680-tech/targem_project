@@ -30,10 +30,26 @@ public class VRSimulator : MonoBehaviour
 
     void Start()
     {
-        left = AddController("Sim Left Controller", CommonUsages.LeftHand);
-        right = AddController("Sim Right Controller", CommonUsages.RightHand);
+        EnsureDevices();
         Debug.Log("[VR] Симулятор шлема: ПКМ+мышь - голова, ЛКМ - курок, F1 - подсказка");
     }
+
+    // Контроллеры могут пропасть (OpenXR перезапускает сессию, редактор сбрасывает устройства) - создаём заново
+    bool EnsureDevices()
+    {
+        try
+        {
+            if (left == null || !left.added) left = AddController("Sim Left Controller", CommonUsages.LeftHand);
+            if (right == null || !right.added) right = AddController("Sim Right Controller", CommonUsages.RightHand);
+            return left != null && right != null;
+        }
+        catch (System.Exception e)
+        {
+            if (!warned) { warned = true; Debug.LogWarning("[VR] Симулятор: не удалось создать контроллер: " + e.Message); }
+            return false;
+        }
+    }
+    bool warned;
 
     static InputDevice AddController(string name, InternedString usage)
     {
@@ -44,8 +60,8 @@ public class VRSimulator : MonoBehaviour
 
     void OnDestroy()
     {
-        if (left != null) InputSystem.RemoveDevice(left);
-        if (right != null) InputSystem.RemoveDevice(right);
+        if (left != null && left.added) InputSystem.RemoveDevice(left);
+        if (right != null && right.added) InputSystem.RemoveDevice(right);
         VRSupport.Simulated = false;
     }
 
@@ -73,17 +89,23 @@ public class VRSimulator : MonoBehaviour
         Quaternion lRot = Quaternion.LookRotation(target - lPos);
 
         // Значения пишем каждый кадр: редактор без фокуса может обнулить устройство
+        if (!EnsureDevices()) return;
         Write(right, rPos, rRot, Input.GetMouseButton(0));
         Write(left, lPos, lRot, false);
     }
 
+    // Пишем как настоящий контроллер - событием состояния. InputState.Change кнопки-биты (курок) менять не умеет
     static void Write(InputDevice d, Vector3 pos, Quaternion rot, bool trigger)
     {
-        InputState.Change((Vector3Control)d["devicePosition"], pos);
-        InputState.Change((QuaternionControl)d["deviceRotation"], rot);
-        InputState.Change((ButtonControl)d["triggerPressed"], trigger ? 1f : 0f);
-        InputState.Change((AxisControl)d["trigger"], trigger ? 1f : 0f);
-        InputState.Change((ButtonControl)d["isTracked"], 1f);
+        using (StateEvent.From(d, out InputEventPtr e))
+        {
+            ((Vector3Control)d["devicePosition"]).WriteValueIntoEvent(pos, e);
+            ((QuaternionControl)d["deviceRotation"]).WriteValueIntoEvent(rot, e);
+            ((ButtonControl)d["triggerPressed"]).WriteValueIntoEvent(trigger ? 1f : 0f, e);
+            ((AxisControl)d["trigger"]).WriteValueIntoEvent(trigger ? 1f : 0f, e);
+            ((ButtonControl)d["isTracked"]).WriteValueIntoEvent(1f, e);
+            InputSystem.QueueEvent(e);
+        }
     }
 
     void OnGUI()

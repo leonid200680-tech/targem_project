@@ -259,8 +259,8 @@ public class VRSupport : MonoBehaviour
         ReadHead();
         if (!hasOrigin && (hmdPos != Vector3.zero || hmdRot != Quaternion.identity)) Recenter();
 
-        Vector2 ls = moveAct.ReadValue<Vector2>(), rs = turnAct.ReadValue<Vector2>();
-        bool run = runAct.IsPressed();
+        Vector2 ls = Stick(moveAct), rs = Stick(turnAct);
+        bool run = Held(runAct);
         // Запасной путь: старый XR API (если Input System не увидел контроллер)
         var l = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
         var r = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
@@ -305,9 +305,27 @@ public class VRSupport : MonoBehaviour
 
     // Момент нажатия ловим сами по IsPressed: WasPressedThisFrame теряет нажатие, если ввод
     // обработан в другом цикле обновления (окно без фокуса, редактор)
+    // Зажата ли кнопка: читаем сами кнопки всех контроллеров, привязанных к действию.
+    // Состояние действия не годится: оно не видит изменений, записанных напрямую (симулятор шлема)
+    static bool Held(InputAction a)
+    {
+        foreach (var c in a.controls)
+            if (c is UnityEngine.InputSystem.Controls.ButtonControl b && b.isPressed) return true;
+        return false;
+    }
+
+    // Стик с наибольшим отклонением среди контроллеров действия (так же напрямую, без состояния действия)
+    static Vector2 Stick(InputAction a)
+    {
+        Vector2 best = Vector2.zero;
+        foreach (var c in a.controls)
+            if (c is UnityEngine.InputSystem.Controls.Vector2Control v && v.ReadValue().sqrMagnitude > best.sqrMagnitude) best = v.ReadValue();
+        return best;
+    }
+
     bool Pressed(InputAction a, string id)
     {
-        bool on = a.IsPressed();
+        bool on = Held(a);
         prev.TryGetValue(id, out bool was);
         prev[id] = on;
         return on && !was;
@@ -553,7 +571,7 @@ public class VRSupport : MonoBehaviour
             if (best is UnityEngine.UI.Slider sl) dragged = sl;
             else UnityEngine.EventSystems.ExecuteEvents.Execute(best.gameObject, Ped(), UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
         }
-        if (!clickAct.IsPressed()) dragged = null;
+        if (!Held(clickAct)) dragged = null;
         if (dragged != null)
         {
             var rt = (RectTransform)dragged.transform;
