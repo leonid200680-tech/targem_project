@@ -270,7 +270,13 @@ public class VRSupport : MonoBehaviour
         Move = ls.magnitude > 0.2f ? ls : Vector2.zero;
         Run = run;
 
-        for (int i = 0; i < buttons.Count; i++) if (Pressed(buttons[i].act, "b" + i)) down.Add(buttons[i].key);
+        for (int i = 0; i < buttons.Count; i++)
+        {
+            if (!Pressed(buttons[i].act, "b" + i)) continue;
+            // В симуляторе курок - это сама ЛКМ, она и так доходит до игры как мышь: без этого клик сработал бы дважды
+            if (Simulated && buttons[i].key == KeyCode.Mouse0) continue;
+            down.Add(buttons[i].key);
+        }
         // Старый API - только если Input System контроллеров не видит, иначе одно нажатие сработало бы дважды
         bool seen = inL.pos.controls.Count > 0 || inR.pos.controls.Count > 0;
         if (seen) l = r = default;
