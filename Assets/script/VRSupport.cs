@@ -21,6 +21,10 @@ public class VRSupport : MonoBehaviour
 {
     public static bool Active { get; private set; }
 
+    // Симулятор шлема в редакторе (VRSimulator): голову задаёт мышь, а не трекинг
+    public static bool Simulated;
+    public static Quaternion SimHeadRot = Quaternion.identity;
+
     // Ввод контроллеров для BotInput
     public static Vector2 Move;          // левый стик
     public static bool Run;              // левый grip (держать)
@@ -99,6 +103,9 @@ public class VRSupport : MonoBehaviour
         if (!XRSettings.isDeviceActive) { Destroy(gameObject); yield break; }
 
         Active = true;
+#if UNITY_EDITOR
+        Simulated = VRSimulator.IsMockRuntime;
+#endif
         // Окно игры на мониторе часто без фокуса (игрок в шлеме) - ввод всё равно нужен
         InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
         Application.runInBackground = true;
@@ -154,6 +161,9 @@ public class VRSupport : MonoBehaviour
         Application.onBeforeRender += BeforeRender;
         StartCoroutine(RestoreAfterFrame());
         Debug.Log("[VR] Шлем найден, VR-режим включён");
+#if UNITY_EDITOR
+        if (VRSimulator.IsMockRuntime) gameObject.AddComponent<VRSimulator>();
+#endif
     }
 
     void OnDestroy()
@@ -199,7 +209,8 @@ public class VRSupport : MonoBehaviour
             var click = module.leftClick != null ? module.leftClick.action : null;
             if (click != null)
                 for (int i = 0; i < click.bindings.Count; i++)
-                    if (click.bindings[i].path.Contains("XRController")) click.ApplyBindingOverride(i, "");
+                    if (click.bindings[i].path.Contains("XRController") || (Simulated && click.bindings[i].path.Contains("Mouse")))
+                        click.ApplyBindingOverride(i, ""); // в симуляторе мышь - это курок, клик жмёт луч
         }
     }
 
@@ -312,6 +323,7 @@ public class VRSupport : MonoBehaviour
 
     void ReadHead()
     {
+        if (Simulated) { hmdPos = Vector3.zero; hmdRot = SimHeadRot; return; }
         var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
         if (head.TryGetFeatureValue(XRCommonUsages.centerEyePosition, out var p) || head.TryGetFeatureValue(XRCommonUsages.devicePosition, out p)) hmdPos = p;
         if (head.TryGetFeatureValue(XRCommonUsages.centerEyeRotation, out var q) || head.TryGetFeatureValue(XRCommonUsages.deviceRotation, out q)) hmdRot = q;
